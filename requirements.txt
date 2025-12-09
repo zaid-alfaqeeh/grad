@@ -1,0 +1,22 @@
+# University Assistant Dependencies
+#
+# SYSTEM ARCHITECTURE:
+# - Embeddings + Cosine Similarity for alias matching
+# - ChatGPT Web Search for data extraction (NO manual scraping)
+# - Redis for caching JSON datasets and alias embeddings
+
+# OpenAI - for web search, embeddings, and reasoning
+openai>=1.0.0
+
+# Redis - for caching
+redis>=5.0.0
+
+# Flask - web framework
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# Environment configuration
+python-dotenv>=1.0.0
+
+# NumPy - for cosine similarity calculations
+numpy>=1.24.0

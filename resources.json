@@ -1,0 +1,19 @@
+{
+  "registration": "https://www.just.edu.jo/Registration/Pages/default.aspx",
+  "fees": "https://www.just.edu.jo/Admission/Pages/Fees.aspx",
+  "admissions": "https://www.just.edu.jo/Admission/Pages/default.aspx",
+  "academic_calendar": "https://www.just.edu.jo/calendar/Pages/default.aspx",
+  "student_services": "https://www.just.edu.jo/StudentAffairs/Pages/default.aspx",
+  "courses_schedule": "https://www.just.edu.jo/Registration/Pages/Schedule.aspx",
+  "admission_rules": "https://www.just.edu.jo/aboutjust/Pages/Regulations.aspx",
+  "scholarships": "https://www.just.edu.jo/Admission/Pages/Scholarships.aspx",
+  "housing": "https://www.just.edu.jo/StudentAffairs/Pages/Housing.aspx",
+  "library": "https://library.just.edu.jo/",
+  "graduation": "https://www.just.edu.jo/Registration/Pages/Graduation.aspx",
+  "transcripts": "https://www.just.edu.jo/Registration/Pages/Transcripts.aspx",
+  "faculties": "https://www.just.edu.jo/FacultiesAndDepartments/Pages/default.aspx",
+  "engineering": "https://www.just.edu.jo/FacultiesAndDepartments/FacultyOfEngineering/Pages/default.aspx",
+  "it": "https://www.just.edu.jo/FacultiesAndDepartments/FacultyOfIT/Pages/default.aspx",
+  "medicine": "https://www.just.edu.jo/FacultiesAndDepartments/FacultyOfMedicine/Pages/default.aspx",
+  "contact": "https://www.just.edu.jo/aboutjust/Pages/ContactUs.aspx"
+}

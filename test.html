@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>University Assistant - Test Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .status-bar {
+            background: #f8f9fa;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #dc3545;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.online {
+            background: #28a745;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .main-content {
+            padding: 30px;
+        }
+
+        .query-section {
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        textarea, input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus, input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .response-section {
+            margin-top: 30px;
+        }
+
+        .response-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .response-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .source-badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .source-redis {
+            background: #28a745;
+            color: white;
+        }
+
+        .source-live {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .answer-box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 15px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .json-box {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 15px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-box {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #dc3545;
+            margin-top: 15px;
+        }
+
+        .example-queries {
+            margin-top: 20px;
+        }
+
+        .example-queries h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .example-btn {
+            display: inline-block;
+            margin: 5px;
+            padding: 8px 16px;
+            background: #e9ecef;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .example-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .toggle-json {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .toggle-json:hover {
+            background: #5a6268;
+        }
+
+        .json-container {
+            display: none;
+        }
+
+        .json-container.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 University Assistant</h1>
+            <p>Intelligent Query System with Redis Caching</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <span>Server Status:</span>
+                <span class="status-indicator" id="serverStatus"></span>
+                <span id="serverStatusText">Checking...</span>
+            </div>
+            <div class="status-item">
+                <span>Redis Status:</span>
+                <span class="status-indicator" id="redisStatus"></span>
+                <span id="redisStatusText">Checking...</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="query-section">
+                <div class="form-group">
+                    <label for="queryInput">Enter Your Question:</label>
+                    <textarea id="queryInput" placeholder="e.g., How do I register for classes?"></textarea>
+                </div>
+
+                <div class="example-queries">
+                    <h3>Example Queries:</h3>
+                    <button class="example-btn" onclick="setQuery('How do I register for classes?')">Registration</button>
+                    <button class="example-btn" onclick="setQuery('What are the registration fees?')">Fees</button>
+                    <button class="example-btn" onclick="setQuery('How do I apply for admission?')">Admissions</button>
+                    <button class="example-btn" onclick="setQuery('When does the semester start?')">Academic Calendar</button>
+                    <button class="example-btn" onclick="setQuery('What student services are available?')">Student Services</button>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-primary" onclick="sendQuery()">Send Query</button>
+                    <button class="btn-secondary" onclick="clearResponse()">Clear</button>
+                    <button class="btn-success" onclick="checkHealth()">Check Health</button>
+                </div>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p style="margin-top: 10px;">Processing your query...</p>
+            </div>
+
+            <div class="response-section" id="responseSection" style="display: none;">
+                <div class="response-card">
+                    <div class="response-header">
+                        <h3>Response</h3>
+                        <span class="source-badge" id="sourceBadge"></span>
+                    </div>
+                    <div class="answer-box" id="answerBox"></div>
+                    <button class="toggle-json" onclick="toggleJson()">Toggle JSON Data</button>
+                    <div class="json-container" id="jsonContainer">
+                        <div class="json-box" id="jsonBox"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="errorSection"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+
+        // Check health on page load
+        window.onload = function() {
+            checkHealth();
+        };
+
+        function setQuery(text) {
+            document.getElementById('queryInput').value = text;
+        }
+
+        function updateStatus(serverOk, redisOk) {
+            const serverIndicator = document.getElementById('serverStatus');
+            const serverText = document.getElementById('serverStatusText');
+            const redisIndicator = document.getElementById('redisStatus');
+            const redisText = document.getElementById('redisStatusText');
+
+            if (serverOk) {
+                serverIndicator.classList.add('online');
+                serverText.textContent = 'Online';
+            } else {
+                serverIndicator.classList.remove('online');
+                serverText.textContent = 'Offline';
+            }
+
+            if (redisOk) {
+                redisIndicator.classList.add('online');
+                redisText.textContent = 'Connected';
+            } else {
+                redisIndicator.classList.remove('online');
+                redisText.textContent = 'Disconnected';
+            }
+        }
+
+        async function checkHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                updateStatus(data.status === 'healthy', data.redis_connected);
+            } catch (error) {
+                updateStatus(false, false);
+                console.error('Health check failed:', error);
+            }
+        }
+
+        async function sendQuery() {
+            const query = document.getElementById('queryInput').value.trim();
+            
+            if (!query) {
+                alert('Please enter a query');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('responseSection').style.display = 'none';
+            document.getElementById('errorSection').innerHTML = '';
+
+            try {
+                const response = await fetch(`${API_BASE}/query`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: query
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Request failed');
+                }
+
+                // Display response
+                displayResponse(data);
+
+            } catch (error) {
+                displayError(error.message);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        function displayResponse(data) {
+            const responseSection = document.getElementById('responseSection');
+            const sourceBadge = document.getElementById('sourceBadge');
+            const answerBox = document.getElementById('answerBox');
+            const jsonBox = document.getElementById('jsonBox');
+
+            // Update source badge
+            if (data.source === 'redis') {
+                sourceBadge.textContent = 'From Cache (Redis)';
+                sourceBadge.className = 'source-badge source-redis';
+            } else {
+                sourceBadge.textContent = 'Live Web';
+                sourceBadge.className = 'source-badge source-live';
+            }
+
+            // Display answer
+            answerBox.textContent = data.answer || 'No answer provided';
+
+            // Display JSON (formatted)
+            jsonBox.textContent = JSON.stringify(data.json, null, 2);
+
+            // Show response section
+            responseSection.style.display = 'block';
+
+            // Scroll to response
+            responseSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function displayError(message) {
+            const errorSection = document.getElementById('errorSection');
+            errorSection.innerHTML = `
+                <div class="error-box">
+                    <strong>Error:</strong> ${message}
+                </div>
+            `;
+        }
+
+        function clearResponse() {
+            document.getElementById('responseSection').style.display = 'none';
+            document.getElementById('errorSection').innerHTML = '';
+            document.getElementById('queryInput').value = '';
+        }
+
+        function toggleJson() {
+            const jsonContainer = document.getElementById('jsonContainer');
+            jsonContainer.classList.toggle('show');
+        }
+
+        // Allow Enter key to send query (Ctrl+Enter)
+        document.getElementById('queryInput').addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                sendQuery();
+            }
+        });
+    </script>
+</body>
+</html>
+
