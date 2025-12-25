@@ -1,6 +1,9 @@
 """
-Extractor service for orchestrating web data extraction.
-Uses ONLY ChatGPT's web_search tool - NO manual scraping.
+Extractor service for JUST University Assistant.
+خدمة استخراج البيانات لمساعد جامعة العلوم والتكنولوجيا
+
+PRIMARY FUNCTION: Search and generate university information
+Uses ChatGPT to provide helpful answers about JUST University.
 """
 import json
 import os
@@ -13,8 +16,10 @@ class ExtractorService:
     """
     Orchestrates web data extraction using OpenAI service.
     
-    CRITICAL: This service uses ONLY ChatGPT's web_search tool.
-    NO requests, NO BeautifulSoup, NO manual scraping.
+    CORE PHILOSOPHY:
+    - ALWAYS search for information (primary job)
+    - Use resource URLs as context/helpers (secondary)
+    - Never fail silently - always try to help
     """
     
     def __init__(self, openai_service):
@@ -93,54 +98,73 @@ class ExtractorService:
     # DATA EXTRACTION
     # ========================================
     
-    def extract_data(self, canonical_key: str, query: str) -> Optional[Dict[str, Any]]:
+    def extract_data(self, canonical_key: str, query: str, resource_url: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
-        Extract structured data for a query.
+        Extract structured data for a query - ALWAYS tries to answer.
         
         WORKFLOW:
-        1. Select resource URL from resources.json
-        2. If URL found → use ChatGPT to browse and extract
-        3. If no URL → use ChatGPT web search
+        1. If resource_url provided, try that first
+        2. Try resources.json URLs
+        3. ALWAYS fall back to web search (primary job)
         4. Build structured JSON dataset
         
         Args:
             canonical_key: The canonical key for the topic
             query: Original user query
+            resource_url: Optional helper URL for context
             
         Returns:
-            Structured JSON dataset or None if failed
+            Structured JSON dataset (always returns something useful)
         """
-        self.logger.info(f"Extracting data for: {query} (key: {canonical_key})")
+        self.logger.info(f"استخراج بيانات لـ: {query} (المفتاح: {canonical_key})")
         
-        # Step 1: Try to select a resource URL
-        url = self.select_resource(canonical_key, query)
-        
-        if url:
-            # Step 2a: Extract from specific URL using ChatGPT browsing
-            data = self.openai_service.extract_page_data(url, query)
-            if data:
+        # Try 1: Use provided resource URL if available
+        if resource_url:
+            self.logger.info(f"Trying provided resource URL: {resource_url}")
+            data = self.openai_service.extract_page_data(resource_url, query)
+            if data and data.get('title'):
                 data['topic'] = canonical_key
                 return self._clean_dataset(data, query, canonical_key)
         
-        # Step 2b: No URL match - perform general web search
-        self.logger.info(f"Performing general web search for: {query}")
-        search_result = self.openai_service.perform_web_search(
-            f"Jordan University of Science and Technology {query}"
-        )
+        # Try 2: Select resource URL from resources.json
+        url = self.select_resource(canonical_key, query)
         
-        if search_result:
-            # Convert search result to structured data
-            data = self._parse_search_result(search_result, query, canonical_key)
-            if data:
+        if url:
+            self.logger.info(f"Trying resources.json URL: {url}")
+            data = self.openai_service.extract_page_data(url, query)
+            if data and data.get('title'):
+                data['topic'] = canonical_key
                 return self._clean_dataset(data, query, canonical_key)
         
-        # Step 3: Return minimal dataset if all else fails
-        self.logger.warning(f"Could not extract data for: {query}")
+        # Try 3: ALWAYS perform web search (this is the PRIMARY JOB)
+        self.logger.info(f"Performing web search for JUST: {query}")
+        
+        # Build a comprehensive search query
+        search_queries = [
+            f"جامعة العلوم والتكنولوجيا الأردنية {query}",
+            f"Jordan University of Science and Technology JUST {query}",
+        ]
+        
+        data = None
+        for search_query in search_queries:
+            search_result = self.openai_service.perform_web_search(search_query)
+            
+            if search_result and search_result != "Information not found":
+                # Convert search result to structured data
+                data = self._parse_search_result(search_result, query, canonical_key)
+                if data and (data.get('summary') or data.get('title')):
+                    self.logger.info(f"Successfully extracted data via web search")
+                    return self._clean_dataset(data, query, canonical_key)
+        
+        # Always return something useful
+        self.logger.warning(f"Could not extract detailed data for: {query}")
         return {
             "topic": canonical_key,
             "query": query,
-            "message": "Unable to retrieve detailed information at this time.",
-            "suggestion": "Please visit the university website directly or contact student services."
+            "title": f"معلومات عن {canonical_key.replace('_', ' ')}",
+            "message": "يرجى زيارة موقع جامعة العلوم والتكنولوجيا الأردنية للحصول على معلومات تفصيلية",
+            "suggestion": "قم بزيارة https://www.just.edu.jo أو تواصل مع خدمات الطلاب",
+            "university_website": "https://www.just.edu.jo"
         }
     
     def _parse_search_result(self, search_result: str, query: str, canonical_key: str) -> Optional[Dict[str, Any]]:

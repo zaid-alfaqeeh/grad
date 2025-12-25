@@ -191,6 +191,9 @@ class EmbeddingsService:
                 best_score = score
                 best_alias = alias
                 best_key = data.get('canonical_key')
+                # Log warning if canonical_key is missing
+                if not best_key:
+                    self.logger.warning(f"Embedding for alias '{alias}' missing canonical_key")
         
         self.logger.debug(f"Best match: '{best_alias}' (key: {best_key}, score: {best_score:.4f})")
         return best_alias, best_key, best_score

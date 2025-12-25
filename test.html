@@ -1,517 +1,799 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>University Assistant - Test Interface</title>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>مساعد جامعة العلوم والتكنولوجيا - JUST Assistant</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+      :root {
+        --primary: #0d4f8b;
+        --primary-dark: #083a66;
+        --secondary: #1a7f64;
+        --accent: #f4a523;
+        --bg-main: #f0f4f8;
+        --bg-card: #ffffff;
+        --text-primary: #1a1a2e;
+        --text-secondary: #4a5568;
+        --border: #e2e8f0;
+        --success: #22c55e;
+        --gradient-primary: linear-gradient(135deg, #0d4f8b 0%, #1a7f64 100%);
+      }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            overflow: hidden;
-        }
+      body {
+        font-family: "IBM Plex Sans Arabic", "Tajawal", sans-serif;
+        background: var(--bg-main);
+        min-height: 100vh;
+        padding: 20px;
+        line-height: 1.7;
+      }
 
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
+      .container {
+        max-width: 1000px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 50px rgba(13, 79, 139, 0.15);
+        overflow: hidden;
+      }
 
+      .header {
+        background: var(--gradient-primary);
+        color: white;
+        padding: 2.5rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .header::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        opacity: 0.3;
+      }
+
+      .header-content {
+        position: relative;
+        z-index: 1;
+      }
+
+      .header h1 {
+        font-family: "Tajawal", sans-serif;
+        font-size: 2.2rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      .header p {
+        opacity: 0.95;
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+      }
+
+      .header-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(255, 255, 255, 0.15);
+        padding: 8px 20px;
+        border-radius: 25px;
+        font-size: 0.9rem;
+        backdrop-filter: blur(5px);
+      }
+
+      .status-bar {
+        background: #f8fafc;
+        padding: 15px 25px;
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        flex-wrap: wrap;
+        border-bottom: 2px solid var(--border);
+      }
+
+      .status-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9rem;
+      }
+
+      .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #dc3545;
+        animation: pulse 2s infinite;
+      }
+
+      .status-indicator.online {
+        background: var(--success);
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .main-content {
+        padding: 2rem;
+      }
+
+      .chat-input-section {
+        margin-bottom: 1.5rem;
+      }
+
+      .form-label {
+        display: block;
+        margin-bottom: 10px;
+        font-weight: 700;
+        color: var(--primary);
+        font-size: 1.1rem;
+      }
+
+      .chat-input-wrapper {
+        position: relative;
+      }
+
+      textarea {
+        width: 100%;
+        padding: 16px 20px;
+        padding-left: 100px;
+        border: 2px solid var(--border);
+        border-radius: 15px;
+        font-size: 16px;
+        font-family: inherit;
+        min-height: 100px;
+        resize: vertical;
+        transition: all 0.3s ease;
+        direction: rtl;
+      }
+
+      textarea:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 4px rgba(13, 79, 139, 0.1);
+      }
+
+      textarea::placeholder {
+        color: #9ca3af;
+      }
+
+      .send-btn {
+        position: absolute;
+        left: 12px;
+        bottom: 12px;
+        padding: 12px 24px;
+        background: var(--gradient-primary);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-family: inherit;
+      }
+
+      .send-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 20px rgba(13, 79, 139, 0.3);
+      }
+
+      .send-btn:active {
+        transform: translateY(0);
+      }
+
+      .send-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .example-section {
+        margin-bottom: 2rem;
+      }
+
+      .example-title {
+        font-weight: 700;
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+        font-size: 0.95rem;
+      }
+
+      .example-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .example-btn {
+        padding: 10px 18px;
+        background: linear-gradient(to right, #f0f4f8, #ffffff);
+        border: 1px solid var(--border);
+        border-radius: 25px;
+        cursor: pointer;
+        font-size: 14px;
+        font-family: inherit;
+        color: var(--text-secondary);
+        transition: all 0.2s ease;
+      }
+
+      .example-btn:hover {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+        transform: translateY(-1px);
+      }
+
+      .tools-section {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        background: #f8fafc;
+        border-radius: 12px;
+      }
+
+      .tool-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+      }
+
+      .tool-link.primary {
+        background: var(--gradient-primary);
+        color: white;
+      }
+
+      .tool-link.secondary {
+        background: var(--secondary);
+        color: white;
+      }
+
+      .tool-link.danger {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+      }
+
+      .tool-link:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+      }
+
+      .tool-link.danger:hover {
+        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+      }
+
+      .loading {
+        display: none;
+        text-align: center;
+        padding: 2rem;
+      }
+
+      .loading.active {
+        display: block;
+      }
+
+      .spinner {
+        width: 45px;
+        height: 45px;
+        border: 4px solid var(--border);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .response-section {
+        display: none;
+        margin-top: 2rem;
+      }
+
+      .response-section.show {
+        display: block;
+        animation: fadeIn 0.4s ease;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .response-card {
+        background: #f8fafc;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+      }
+
+      .response-header {
+        background: var(--gradient-primary);
+        color: white;
+        padding: 1rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .response-header h3 {
+        font-weight: 700;
+      }
+
+      .source-badge {
+        padding: 5px 14px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+
+      .source-badge.redis {
+        background: var(--success);
+        color: white;
+      }
+
+      .source-badge.live {
+        background: var(--accent);
+        color: white;
+      }
+
+      .answer-box {
+        padding: 1.5rem;
+        background: white;
+        line-height: 1.8;
+        font-size: 1rem;
+        white-space: pre-wrap;
+      }
+
+      .toggle-json-btn {
+        background: #e2e8f0;
+        border: none;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+        transition: all 0.2s ease;
+        margin: 0.5rem 1rem;
+        border-radius: 8px;
+      }
+
+      .toggle-json-btn:hover {
+        background: var(--primary);
+        color: white;
+      }
+
+      .json-container {
+        display: none;
+        padding: 1rem;
+      }
+
+      .json-container.show {
+        display: block;
+      }
+
+      .json-box {
+        background: #1e293b;
+        color: #e2e8f0;
+        padding: 1.25rem;
+        border-radius: 10px;
+        font-family: "Courier New", monospace;
+        font-size: 0.85rem;
+        overflow-x: auto;
+        direction: ltr;
+        text-align: left;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .error-box {
+        background: #fef2f2;
+        color: #dc2626;
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        border-right: 4px solid #dc2626;
+        margin-top: 1rem;
+      }
+
+      @media (max-width: 768px) {
         .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+          font-size: 1.6rem;
         }
-
-        .header p {
-            opacity: 0.9;
-            font-size: 1.1em;
-        }
-
         .status-bar {
-            background: #f8f9fa;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #e9ecef;
+          flex-direction: column;
+          gap: 0.75rem;
         }
-
-        .status-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .status-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #dc3545;
-            animation: pulse 2s infinite;
-        }
-
-        .status-indicator.online {
-            background: #28a745;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
         .main-content {
-            padding: 30px;
+          padding: 1.25rem;
         }
-
-        .query-section {
-            margin-bottom: 30px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #333;
-        }
-
-        textarea, input[type="text"] {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
-            font-size: 16px;
-            font-family: inherit;
-            transition: border-color 0.3s;
-        }
-
-        textarea:focus, input[type="text"]:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
         textarea {
-            min-height: 100px;
-            resize: vertical;
+          padding-left: 16px;
+          padding-bottom: 60px;
         }
-
-        .button-group {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
+        .send-btn {
+          left: 12px;
+          right: 12px;
+          width: calc(100% - 24px);
         }
-
-        button {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-primary:active {
-            transform: translateY(0);
-        }
-
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-
-        .btn-success {
-            background: #28a745;
-            color: white;
-        }
-
-        .btn-success:hover {
-            background: #218838;
-        }
-
-        .response-section {
-            margin-top: 30px;
-        }
-
-        .response-card {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-left: 4px solid #667eea;
-        }
-
-        .response-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .source-badge {
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .source-redis {
-            background: #28a745;
-            color: white;
-        }
-
-        .source-live {
-            background: #17a2b8;
-            color: white;
-        }
-
-        .answer-box {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 15px;
-            line-height: 1.6;
-            white-space: pre-wrap;
-        }
-
-        .json-box {
-            background: #2d2d2d;
-            color: #f8f8f2;
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 15px;
-            overflow-x: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-        }
-
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 20px;
-        }
-
-        .loading.active {
-            display: block;
-        }
-
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .error-box {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 8px;
-            border-left: 4px solid #dc3545;
-            margin-top: 15px;
-        }
-
-        .example-queries {
-            margin-top: 20px;
-        }
-
-        .example-queries h3 {
-            margin-bottom: 10px;
-            color: #333;
-        }
-
-        .example-btn {
-            display: inline-block;
-            margin: 5px;
-            padding: 8px 16px;
-            background: #e9ecef;
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-
-        .example-btn:hover {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
-        }
-
-        .toggle-json {
-            background: #6c757d;
-            color: white;
-            border: none;
-            padding: 5px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-top: 10px;
-        }
-
-        .toggle-json:hover {
-            background: #5a6268;
-        }
-
-        .json-container {
-            display: none;
-        }
-
-        .json-container.show {
-            display: block;
-        }
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container">
-        <div class="header">
-            <h1>🎓 University Assistant</h1>
-            <p>Intelligent Query System with Redis Caching</p>
+      <header class="header">
+        <div class="header-content">
+          <h1>🎓 مساعد جامعة العلوم والتكنولوجيا</h1>
+          <p>اسأل أي سؤال عن الجامعة وسأبحث وأجيبك فوراً</p>
+          <div class="header-badge">
+            <span>🇯🇴</span>
+            <span>Jordan University of Science and Technology - JUST</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="status-bar">
+        <div class="status-item">
+          <span class="status-indicator" id="serverStatus"></span>
+          <span
+            >السيرفر: <strong id="serverStatusText">جاري الفحص...</strong></span
+          >
+        </div>
+        <div class="status-item">
+          <span class="status-indicator" id="redisStatus"></span>
+          <span
+            >الكاش: <strong id="redisStatusText">جاري الفحص...</strong></span
+          >
+        </div>
+        <div class="status-item">
+          <span class="status-indicator" id="openaiStatus"></span>
+          <span
+            >البحث: <strong id="openaiStatusText">جاري الفحص...</strong></span
+          >
+        </div>
+      </div>
+
+      <div class="main-content">
+        <div class="chat-input-section">
+          <label class="form-label">💬 اكتب سؤالك هنا:</label>
+          <div class="chat-input-wrapper">
+            <textarea
+              id="queryInput"
+              placeholder="مثال: كيف أسجل المواد؟ / ما هي رسوم الجامعة؟ / متى يبدأ الفصل؟"
+            ></textarea>
+            <button class="send-btn" id="sendBtn" onclick="sendQuery()">
+              🔍 ابحث
+            </button>
+          </div>
         </div>
 
-        <div class="status-bar">
-            <div class="status-item">
-                <span>Server Status:</span>
-                <span class="status-indicator" id="serverStatus"></span>
-                <span id="serverStatusText">Checking...</span>
-            </div>
-            <div class="status-item">
-                <span>Redis Status:</span>
-                <span class="status-indicator" id="redisStatus"></span>
-                <span id="redisStatusText">Checking...</span>
-            </div>
+        <div class="example-section">
+          <div class="example-title">💡 أمثلة على الأسئلة:</div>
+          <div class="example-grid">
+            <button
+              class="example-btn"
+              onclick="setQuery('كيف أسجل المواد في الجامعة؟')"
+            >
+              تسجيل المواد
+            </button>
+            <button
+              class="example-btn"
+              onclick="setQuery('كم رسوم الساعة المعتمدة؟')"
+            >
+              الرسوم الجامعية
+            </button>
+            <button
+              class="example-btn"
+              onclick="setQuery('شو شروط القبول في الجامعة؟')"
+            >
+              شروط القبول
+            </button>
+            <button
+              class="example-btn"
+              onclick="setQuery('متى يبدأ التسجيل للفصل الجديد؟')"
+            >
+              موعد التسجيل
+            </button>
+            <button
+              class="example-btn"
+              onclick="setQuery('وين موقع كلية الهندسة؟')"
+            >
+              الكليات
+            </button>
+            <button
+              class="example-btn"
+              onclick="setQuery('كيف أحسب معدلي التراكمي؟')"
+            >
+              حساب المعدل
+            </button>
+            <button
+              class="example-btn"
+              onclick="setQuery('What are the graduation requirements?')"
+            >
+              Graduation
+            </button>
+            <button
+              class="example-btn"
+              onclick="setQuery('How do I apply for scholarships?')"
+            >
+              Scholarships
+            </button>
+          </div>
         </div>
 
-        <div class="main-content">
-            <div class="query-section">
-                <div class="form-group">
-                    <label for="queryInput">Enter Your Question:</label>
-                    <textarea id="queryInput" placeholder="e.g., How do I register for classes?"></textarea>
-                </div>
-
-                <div class="example-queries">
-                    <h3>Example Queries:</h3>
-                    <button class="example-btn" onclick="setQuery('How do I register for classes?')">Registration</button>
-                    <button class="example-btn" onclick="setQuery('What are the registration fees?')">Fees</button>
-                    <button class="example-btn" onclick="setQuery('How do I apply for admission?')">Admissions</button>
-                    <button class="example-btn" onclick="setQuery('When does the semester start?')">Academic Calendar</button>
-                    <button class="example-btn" onclick="setQuery('What student services are available?')">Student Services</button>
-                </div>
-
-                <div class="button-group">
-                    <button class="btn-primary" onclick="sendQuery()">Send Query</button>
-                    <button class="btn-secondary" onclick="clearResponse()">Clear</button>
-                    <button class="btn-success" onclick="checkHealth()">Check Health</button>
-                </div>
-            </div>
-
-            <div class="loading" id="loading">
-                <div class="spinner"></div>
-                <p style="margin-top: 10px;">Processing your query...</p>
-            </div>
-
-            <div class="response-section" id="responseSection" style="display: none;">
-                <div class="response-card">
-                    <div class="response-header">
-                        <h3>Response</h3>
-                        <span class="source-badge" id="sourceBadge"></span>
-                    </div>
-                    <div class="answer-box" id="answerBox"></div>
-                    <button class="toggle-json" onclick="toggleJson()">Toggle JSON Data</button>
-                    <div class="json-container" id="jsonContainer">
-                        <div class="json-box" id="jsonBox"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="errorSection"></div>
+        <div class="tools-section">
+          <a href="static/quick_view_redis.html" class="tool-link primary">
+            <span>📊</span>
+            <span>عرض البيانات المخزنة</span>
+          </a>
+          <a href="static/view_redis_data.html" class="tool-link secondary">
+            <span>📋</span>
+            <span>العرض التفصيلي</span>
+          </a>
+          <button
+            class="tool-link danger"
+            onclick="clearCache()"
+            style="border: none; cursor: pointer"
+          >
+            <span>🗑️</span>
+            <span>مسح الكاش</span>
+          </button>
         </div>
+
+        <div class="loading" id="loading">
+          <div class="spinner"></div>
+          <p>جاري البحث عن المعلومات... ⏳</p>
+        </div>
+
+        <div class="response-section" id="responseSection">
+          <div class="response-card">
+            <div class="response-header">
+              <h3>📝 الإجابة</h3>
+              <span class="source-badge" id="sourceBadge"></span>
+            </div>
+            <div class="answer-box" id="answerBox"></div>
+            <button class="toggle-json-btn" onclick="toggleJson()">
+              📄 عرض البيانات الخام
+            </button>
+            <div class="json-container" id="jsonContainer">
+              <div class="json-box" id="jsonBox"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="errorSection"></div>
+      </div>
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:5000';
+      const API_BASE = window.location.origin;
 
-        // Check health on page load
-        window.onload = function() {
-            checkHealth();
-        };
+      window.onload = function () {
+        checkHealth();
+      };
 
-        function setQuery(text) {
-            document.getElementById('queryInput').value = text;
+      function setQuery(text) {
+        document.getElementById("queryInput").value = text;
+        document.getElementById("queryInput").focus();
+      }
+
+      function updateStatus(serverOk, redisOk, openaiOk) {
+        const serverIndicator = document.getElementById("serverStatus");
+        const serverText = document.getElementById("serverStatusText");
+        const redisIndicator = document.getElementById("redisStatus");
+        const redisText = document.getElementById("redisStatusText");
+        const openaiIndicator = document.getElementById("openaiStatus");
+        const openaiText = document.getElementById("openaiStatusText");
+
+        if (serverOk) {
+          serverIndicator.classList.add("online");
+          serverText.textContent = "متصل ✓";
+        } else {
+          serverIndicator.classList.remove("online");
+          serverText.textContent = "غير متصل";
         }
 
-        function updateStatus(serverOk, redisOk) {
-            const serverIndicator = document.getElementById('serverStatus');
-            const serverText = document.getElementById('serverStatusText');
-            const redisIndicator = document.getElementById('redisStatus');
-            const redisText = document.getElementById('redisStatusText');
-
-            if (serverOk) {
-                serverIndicator.classList.add('online');
-                serverText.textContent = 'Online';
-            } else {
-                serverIndicator.classList.remove('online');
-                serverText.textContent = 'Offline';
-            }
-
-            if (redisOk) {
-                redisIndicator.classList.add('online');
-                redisText.textContent = 'Connected';
-            } else {
-                redisIndicator.classList.remove('online');
-                redisText.textContent = 'Disconnected';
-            }
+        if (redisOk) {
+          redisIndicator.classList.add("online");
+          redisText.textContent = "متصل ✓";
+        } else {
+          redisIndicator.classList.remove("online");
+          redisText.textContent = "غير متصل";
         }
 
-        async function checkHealth() {
-            try {
-                const response = await fetch(`${API_BASE}/health`);
-                const data = await response.json();
-                updateStatus(data.status === 'healthy', data.redis_connected);
-            } catch (error) {
-                updateStatus(false, false);
-                console.error('Health check failed:', error);
-            }
+        if (openaiOk) {
+          openaiIndicator.classList.add("online");
+          openaiText.textContent = "جاهز ✓";
+        } else {
+          openaiIndicator.classList.remove("online");
+          openaiText.textContent = "غير مفعل";
+        }
+      }
+
+      async function checkHealth() {
+        try {
+          const response = await fetch(`${API_BASE}/health`);
+          const data = await response.json();
+          updateStatus(
+            data.status === "healthy",
+            data.redis_connected,
+            data.openai_configured
+          );
+        } catch (error) {
+          updateStatus(false, false, false);
+          console.error("Health check failed:", error);
+        }
+      }
+
+      async function sendQuery() {
+        const query = document.getElementById("queryInput").value.trim();
+        const sendBtn = document.getElementById("sendBtn");
+
+        if (!query) {
+          alert("الرجاء كتابة سؤالك أولاً");
+          return;
         }
 
-        async function sendQuery() {
-            const query = document.getElementById('queryInput').value.trim();
-            
-            if (!query) {
-                alert('Please enter a query');
-                return;
-            }
+        // Show loading
+        document.getElementById("loading").classList.add("active");
+        document.getElementById("responseSection").classList.remove("show");
+        document.getElementById("errorSection").innerHTML = "";
+        sendBtn.disabled = true;
+        sendBtn.textContent = "⏳ جاري البحث...";
 
-            // Show loading
-            document.getElementById('loading').classList.add('active');
-            document.getElementById('responseSection').style.display = 'none';
-            document.getElementById('errorSection').innerHTML = '';
+        try {
+          const response = await fetch(`${API_BASE}/query`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              query: query,
+            }),
+          });
 
-            try {
-                const response = await fetch(`${API_BASE}/query`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        query: query
-                    })
-                });
+          const data = await response.json();
 
-                const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "فشل في الحصول على الإجابة");
+          }
 
-                if (!response.ok) {
-                    throw new Error(data.error || 'Request failed');
-                }
+          displayResponse(data);
+        } catch (error) {
+          displayError(error.message);
+        } finally {
+          document.getElementById("loading").classList.remove("active");
+          sendBtn.disabled = false;
+          sendBtn.textContent = "🔍 ابحث";
+        }
+      }
 
-                // Display response
-                displayResponse(data);
+      function displayResponse(data) {
+        const responseSection = document.getElementById("responseSection");
+        const sourceBadge = document.getElementById("sourceBadge");
+        const answerBox = document.getElementById("answerBox");
+        const jsonBox = document.getElementById("jsonBox");
 
-            } catch (error) {
-                displayError(error.message);
-            } finally {
-                document.getElementById('loading').classList.remove('active');
-            }
+        // Update source badge
+        if (data.source === "redis") {
+          sourceBadge.textContent = "⚡ من الكاش";
+          sourceBadge.className = "source-badge redis";
+        } else {
+          sourceBadge.textContent = "🌐 بحث مباشر";
+          sourceBadge.className = "source-badge live";
         }
 
-        function displayResponse(data) {
-            const responseSection = document.getElementById('responseSection');
-            const sourceBadge = document.getElementById('sourceBadge');
-            const answerBox = document.getElementById('answerBox');
-            const jsonBox = document.getElementById('jsonBox');
+        // Display answer
+        answerBox.textContent = data.answer || "لم يتم العثور على إجابة";
 
-            // Update source badge
-            if (data.source === 'redis') {
-                sourceBadge.textContent = 'From Cache (Redis)';
-                sourceBadge.className = 'source-badge source-redis';
-            } else {
-                sourceBadge.textContent = 'Live Web';
-                sourceBadge.className = 'source-badge source-live';
-            }
+        // Display JSON
+        jsonBox.textContent = JSON.stringify(data.json, null, 2);
 
-            // Display answer
-            answerBox.textContent = data.answer || 'No answer provided';
+        // Show response section
+        responseSection.classList.add("show");
 
-            // Display JSON (formatted)
-            jsonBox.textContent = JSON.stringify(data.json, null, 2);
+        // Scroll to response
+        responseSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
 
-            // Show response section
-            responseSection.style.display = 'block';
+      function displayError(message) {
+        const errorSection = document.getElementById("errorSection");
+        errorSection.innerHTML = `
+          <div class="error-box">
+            <strong>❌ خطأ:</strong> ${message}
+          </div>
+        `;
+      }
 
-            // Scroll to response
-            responseSection.scrollIntoView({ behavior: 'smooth' });
+      function toggleJson() {
+        const jsonContainer = document.getElementById("jsonContainer");
+        jsonContainer.classList.toggle("show");
+      }
+
+      async function clearCache() {
+        // Confirm before clearing
+        const confirmed = confirm(
+          "⚠️ هل أنت متأكد من مسح جميع البيانات المخزنة في الكاش؟\n\n" +
+            "هذا الإجراء لا يمكن التراجع عنه.\n" +
+            "سيتم حذف جميع البيانات والأسماء المستعارة والتضمينات."
+        );
+
+        if (!confirmed) {
+          return;
         }
 
-        function displayError(message) {
-            const errorSection = document.getElementById('errorSection');
-            errorSection.innerHTML = `
-                <div class="error-box">
-                    <strong>Error:</strong> ${message}
-                </div>
-            `;
-        }
+        try {
+          const response = await fetch(`${API_BASE}/api/redis/clear`, {
+            method: "DELETE",
+          });
 
-        function clearResponse() {
-            document.getElementById('responseSection').style.display = 'none';
-            document.getElementById('errorSection').innerHTML = '';
-            document.getElementById('queryInput').value = '';
-        }
+          if (!response.ok) {
+            throw new Error("فشل في مسح الكاش");
+          }
 
-        function toggleJson() {
-            const jsonContainer = document.getElementById('jsonContainer');
-            jsonContainer.classList.toggle('show');
-        }
+          const data = await response.json();
 
-        // Allow Enter key to send query (Ctrl+Enter)
-        document.getElementById('queryInput').addEventListener('keydown', function(e) {
-            if (e.ctrlKey && e.key === 'Enter') {
-                sendQuery();
-            }
+          // Show success message
+          alert(
+            "✅ تم مسح الكاش بنجاح!\n\n" +
+              (data.message || "تم حذف جميع البيانات المخزنة.")
+          );
+
+          // Refresh status
+          checkHealth();
+        } catch (error) {
+          alert("❌ خطأ في مسح الكاش:\n" + error.message);
+          console.error("Clear cache error:", error);
+        }
+      }
+
+      // Allow Enter key to send query (Ctrl+Enter)
+      document
+        .getElementById("queryInput")
+        .addEventListener("keydown", function (e) {
+          if (e.ctrlKey && e.key === "Enter") {
+            sendQuery();
+          }
         });
     </script>
-</body>
+  </body>
 </html>
-

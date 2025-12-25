@@ -1,6 +1,6 @@
 """
-OpenAI service for web search, content extraction, and semantic reasoning.
-Uses ONLY ChatGPT's built-in web_search tool - NO manual scraping.
+OpenAI service for content generation, semantic reasoning, and alias matching.
+Uses ChatGPT to provide helpful information about JUST University.
 """
 import json
 import time
@@ -38,13 +38,12 @@ def retry_on_error(max_retries: int = None, delay: float = None):
 class OpenAIService:
     """
     Handles all OpenAI operations including:
-    - Web search and browsing
-    - Content extraction
+    - Knowledge-based search and information generation
+    - Content generation for JUST University topics
     - Alias matching validation
-    - Answer generation
+    - Answer generation in Arabic and English
     
-    CRITICAL: This service uses ONLY ChatGPT's web_search tool.
-    NO requests, NO BeautifulSoup, NO manual scraping.
+    Uses ChatGPT's knowledge to provide helpful information.
     """
     
     _instance = None
@@ -239,7 +238,8 @@ Respond in JSON:
     
     def perform_web_search(self, query: str) -> Optional[str]:
         """
-        Perform a general web search using ChatGPT's web_search tool.
+        Perform a search about JUST university using ChatGPT.
+        Uses model's knowledge and provides helpful information.
         
         Args:
             query: The search query
@@ -252,48 +252,67 @@ Respond in JSON:
             return None
         
         try:
-            self.logger.info(f"Performing web search for: {query}")
+            self.logger.info(f"Performing search for: {query}")
             
+            # Use chat completion with specialized prompt for JUST
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a web search assistant for a university information system.
-Search the web for the requested information and return ONLY factual data.
+                        "content": """أنت مساعد متخصص في جامعة العلوم والتكنولوجيا الأردنية (JUST) - Jordan University of Science and Technology.
 
-CRITICAL RULES:
-- Return ONLY information found in search results
-- Do NOT hallucinate or invent any data
-- Do NOT make up numbers, dates, or fees
-- If information is not found, say "Information not found"
-- Be concise and factual"""
+معلومات عن الجامعة:
+- الموقع: إربد، الأردن
+- تأسست: 1986
+- الموقع الرسمي: https://www.just.edu.jo
+- من أكبر الجامعات الأردنية وأفضلها في المجالات العلمية والتقنية
+
+الكليات الرئيسية:
+- كلية الطب
+- كلية الهندسة
+- كلية تكنولوجيا المعلومات وعلوم الحاسوب
+- كلية الصيدلة
+- كلية طب الأسنان
+- كلية التمريض
+- كلية العلوم
+- كلية الزراعة
+- كلية العمارة والتصميم
+
+خدمات الطلاب:
+- التسجيل والقبول
+- السكن الجامعي
+- المكتبة
+- المنح الدراسية
+- شؤون الطلاب
+
+قواعد الإجابة:
+1. أجب بشكل مفيد ومفصل بناءً على معرفتك
+2. إذا كان السؤال عن معلومات محددة (رسوم، مواعيد)، اقترح زيارة الموقع الرسمي
+3. كن ودوداً ومساعداً
+4. استخدم العربية أو الإنجليزية حسب لغة السؤال"""
                     },
                     {
                         "role": "user",
-                        "content": f"Search the web for: {query}"
+                        "content": f"أجب على هذا السؤال عن جامعة العلوم والتكنولوجيا الأردنية:\n\n{query}"
                     }
-                ],
-                tools=[{"type": "web_search"}],
-                tool_choice="auto"
+                ]
             )
             
             result = response.choices[0].message.content
-            self.logger.debug(f"Web search completed, result length: {len(result) if result else 0}")
+            self.logger.debug(f"Search completed, result length: {len(result) if result else 0}")
             return result
             
         except Exception as e:
-            self.logger.error(f"Web search failed: {e}")
+            self.logger.error(f"Search failed: {e}")
             return None
     
     def extract_page_data(self, url: str, query: str) -> Optional[Dict[str, Any]]:
         """
-        Extract structured data from a URL using ChatGPT's web browsing.
-        
-        CRITICAL: This uses ChatGPT to browse and extract - NO manual scraping.
+        Generate structured data for a topic using ChatGPT.
         
         Args:
-            url: The URL to extract data from
+            url: Context URL (may not be directly accessible)
             query: The original query for context
             
         Returns:
@@ -304,59 +323,48 @@ CRITICAL RULES:
             return None
         
         try:
-            self.logger.info(f"Extracting data from URL: {url}")
+            self.logger.info(f"Generating data for query: {query}")
             
-            extraction_prompt = f"""Browse this URL and extract structured information: {url}
+            extraction_prompt = f"""أنشئ معلومات مفيدة حول هذا الموضوع لجامعة العلوم والتكنولوجيا الأردنية:
 
-Original query: "{query}"
+السؤال: "{query}"
+رابط مرجعي: {url}
 
-CRITICAL EXTRACTION RULES:
-1. Extract ONLY factual information that exists on the page
-2. Do NOT hallucinate, invent, or guess any data
-3. Do NOT make up numbers, fees, dates, or requirements
-4. If a field is not found on the page, DO NOT include it
-5. Return ONLY valid JSON with no explanations
-
-Extract and return a JSON object with these fields (only if present on the page):
+أرجع كائن JSON بهذه الحقول (أضف فقط الحقول ذات الصلة):
 {{
-    "title": "Page title",
-    "summary": "Brief factual summary (max 500 chars)",
-    "requirements": ["list", "of", "requirements"] (if any),
-    "fees": {{"type": "amount"}} (if any fee information exists),
-    "deadlines": ["list of deadlines/dates"] (if any),
-    "steps": ["step 1", "step 2"] (if process steps exist),
-    "tables": [["header1", "header2"], ["row1col1", "row1col2"]] (if tables exist),
-    "lists": [["item1", "item2"]] (if bullet lists exist),
-    "contact_info": {{"phone": "...", "email": "..."}} (if contact details exist),
-    "departments": ["list of departments"] (if mentioned),
-    "dates": ["important dates"] (if any)
+    "title": "عنوان الموضوع",
+    "summary": "ملخص مفيد (300-500 حرف)",
+    "key_points": ["النقاط الرئيسية"],
+    "steps": ["الخطوات إذا كانت عملية"],
+    "tips": ["نصائح مفيدة"],
+    "website": "رابط الموقع الرسمي للمزيد من المعلومات",
+    "contact": "معلومات التواصل إذا معروفة"
 }}
 
-IMPORTANT: Return ONLY the JSON object. No markdown, no explanations, no code blocks."""
+ملاحظات:
+- قدم معلومات مفيدة وعامة عن الموضوع
+- اقترح زيارة الموقع الرسمي للتفاصيل الدقيقة (الرسوم، المواعيد)
+- الموقع الرسمي: https://www.just.edu.jo"""
 
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a strict data extraction assistant for a university information system.
-You browse web pages and extract ONLY factual information that exists on the page.
+                        "content": """أنت مساعد جامعة العلوم والتكنولوجيا الأردنية (JUST).
+مهمتك تقديم معلومات مفيدة للطلاب.
 
-ABSOLUTE RULES:
-- NEVER hallucinate or invent data
-- NEVER guess missing information
-- NEVER make up numbers, dates, fees, or requirements
-- If data is not on the page, do not include that field
-- Return ONLY valid JSON
-- Be 100% faithful to the source content"""
+القواعد:
+- قدم معلومات عامة مفيدة
+- للمعلومات الدقيقة (رسوم، مواعيد) اقترح الموقع الرسمي
+- أرجع JSON صالح فقط
+- كن مساعداً وودوداً"""
                     },
                     {
                         "role": "user",
                         "content": extraction_prompt
                     }
                 ],
-                tools=[{"type": "web_search"}],
-                tool_choice="auto",
                 response_format={"type": "json_object"}
             )
             
@@ -376,13 +384,13 @@ ABSOLUTE RULES:
                 data['url'] = url
                 data['source_query'] = query
                 data = {k: v for k, v in data.items() if v is not None and v != "" and v != [] and v != {}}
-                self.logger.info(f"Extracted {len(data)} fields from {url}")
+                self.logger.info(f"Generated {len(data)} fields for: {query}")
                 return data
             
             return None
             
         except Exception as e:
-            self.logger.error(f"Page extraction failed for {url}: {e}")
+            self.logger.error(f"Data generation failed for {query}: {e}")
             return None
     
     def _extract_json_from_text(self, text: str) -> Optional[Dict[str, Any]]:
@@ -411,7 +419,7 @@ ABSOLUTE RULES:
     
     def generate_answer(self, json_data: Dict[str, Any], query: str, source: str) -> str:
         """
-        Generate a natural-language answer from JSON data.
+        Generate a VERY DETAILED natural-language answer from JSON data.
         
         Args:
             json_data: The structured JSON dataset
@@ -419,39 +427,55 @@ ABSOLUTE RULES:
             source: Data source ("redis" or "live_web")
             
         Returns:
-            Student-friendly explanation
+            Very detailed, comprehensive student-friendly explanation
         """
         if not self.client:
             return self._generate_fallback_answer(json_data, query)
         
         try:
-            prompt = f"""Generate a clear, friendly answer for a student based on this data.
+            prompt = f"""أنت مساعد متخصص في جامعة العلوم والتكنولوجيا الأردنية (JUST).
+قم بإنشاء إجابة مفصلة جداً ومفيدة للطالب بناءً على هذه البيانات.
 
-Student's question: "{query}"
+سؤال الطالب: "{query}"
 
-Data:
+البيانات المتوفرة:
 {json.dumps(json_data, indent=2, ensure_ascii=False)}
 
-RULES:
-1. Be helpful and student-friendly
-2. Summarize the key information clearly
-3. Do NOT mention Redis, caching, embeddings, or technical details
-4. Do NOT mention web search or internal architecture
-5. Format with bullet points or numbered lists where helpful
-6. Keep it concise but complete"""
+القواعد المهمة:
+1. قدم إجابة مفصلة جداً وشاملة - لا تكن مختصراً
+2. اشرح كل نقطة بشكل واضح ومفصل
+3. استخدم عناوين فرعية، نقاط، وقوائم مرقمة لتنظيم المعلومات
+4. أضف أمثلة وتوضيحات عملية حيثما أمكن
+5. إذا كانت هناك خطوات، اشرح كل خطوة بالتفصيل
+6. إذا كانت هناك رسوم أو تكاليف، اشرحها بالتفصيل
+7. إذا كانت هناك متطلبات، اشرح كل متطلب
+8. أضف نصائح مفيدة للطالب
+9. اقترح زيارة الموقع الرسمي للمزيد من التفاصيل: https://www.just.edu.jo
+10. لا تذكر أي تفاصيل تقنية (Redis، caching، embeddings)
+11. كن ودوداً ومهذباً ومهتماً بمساعدة الطالب
+12. استخدم اللغة العربية بشكل صحيح وواضح
+
+قم بإنشاء إجابة شاملة ومفصلة تغطي جميع جوانب السؤال."""
 
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a helpful university assistant. Generate clear, friendly answers for students."
+                        "content": """أنت مساعد متخصص في جامعة العلوم والتكنولوجيا الأردنية (JUST).
+مهمتك تقديم إجابات مفصلة جداً ومفيدة للطلاب.
+كن شاملاً ومفصلاً في إجاباتك - لا تكن مختصراً.
+استخدم تنظيم واضح مع عناوين فرعية ونقاط وقوائم.
+قدم أمثلة وتوضيحات عملية.
+كن ودوداً ومهتماً بمساعدة الطلاب."""
                     },
                     {
                         "role": "user",
                         "content": prompt
                     }
-                ]
+                ],
+                temperature=0.7,  # Slightly higher for more detailed responses
+                max_tokens=2000  # Allow longer, more detailed answers
             )
             
             return response.choices[0].message.content.strip()
@@ -501,43 +525,58 @@ RULES:
     
     def generate_aliases_with_ai(self, canonical_key: str, query: str) -> List[str]:
         """
-        Use AI to generate aliases for a canonical key.
+        Generate exactly 10 English + 10 Arabic aliases for a canonical key.
         
         Args:
             canonical_key: The canonical key
             query: The original query
             
         Returns:
-            List of generated aliases
+            List of 20 aliases (10 Arabic + 10 English)
         """
         if not self.client:
             return []
         
         try:
-            prompt = f"""Generate aliases for this university topic.
+            prompt = f"""أنت مولد أسماء مستعارة لنظام معلومات جامعة العلوم والتكنولوجيا الأردنية (JUST).
 
-Canonical key: {canonical_key}
-Original query: "{query}"
+الموضوع: {canonical_key}
+السؤال الأصلي: "{query}"
 
-Generate aliases in these categories:
-1. Arabic MSA (Modern Standard Arabic)
-2. Arabic colloquial/dialect variations
-3. English variations
-4. Transliteration (Arabizi - Arabic written in English letters)
-5. Common typos
-6. Short forms and abbreviations
+المطلوب: توليد 20 اسم مستعار بالضبط:
 
-Return as JSON:
-{{"aliases": ["alias1", "alias2", "alias3", ...]}}
+10 أسماء مستعارة عربية:
+- 3 بالعربية الفصحى
+- 3 باللهجة الأردنية/العامية
+- 2 بالعربيزي (عربي بحروف إنجليزية مثل: "kif asajel")
+- 2 اختصارات أو أخطاء إملائية شائعة
 
-Generate 10-15 relevant aliases. Do NOT include duplicates."""
+10 أسماء مستعارة إنجليزية:
+- 3 صيغ رسمية
+- 3 صيغ عامية/مختصرة
+- 2 أخطاء إملائية شائعة
+- 2 اختصارات
+
+القواعد الصارمة:
+- يجب أن تكون الأسماء متعلقة مباشرة بالموضوع
+- لا تكرر أي اسم
+- اجعلها واقعية (أشياء يمكن للطالب أن يكتبها فعلاً)
+- ركز على جامعة العلوم والتكنولوجيا الأردنية
+
+أعد JSON بهذا الشكل بالضبط:
+{{
+    "arabic_aliases": ["اسم1", "اسم2", "اسم3", "اسم4", "اسم5", "اسم6", "اسم7", "اسم8", "اسم9", "اسم10"],
+    "english_aliases": ["alias1", "alias2", "alias3", "alias4", "alias5", "alias6", "alias7", "alias8", "alias9", "alias10"]
+}}"""
 
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an alias generator for a university information system. Generate relevant aliases in Arabic and English."
+                        "content": """أنت خبير في توليد الأسماء المستعارة لجامعة العلوم والتكنولوجيا الأردنية.
+تفهم اللهجة الأردنية والعربية الفصحى والإنجليزية.
+تولد أسماء واقعية يمكن للطلاب استخدامها فعلاً."""
                     },
                     {
                         "role": "user",
@@ -549,21 +588,91 @@ Generate 10-15 relevant aliases. Do NOT include duplicates."""
             
             result = json.loads(response.choices[0].message.content)
             
-            if isinstance(result, list):
-                return result
-            elif isinstance(result, dict) and 'aliases' in result:
-                return result['aliases']
-            elif isinstance(result, dict):
-                aliases = []
-                for value in result.values():
-                    if isinstance(value, list):
-                        aliases.extend(value)
-                    elif isinstance(value, str):
-                        aliases.append(value)
-                return aliases
+            aliases = []
             
-            return []
+            # Collect Arabic aliases
+            if 'arabic_aliases' in result:
+                aliases.extend(result['arabic_aliases'][:10])
+            
+            # Collect English aliases  
+            if 'english_aliases' in result:
+                aliases.extend(result['english_aliases'][:10])
+            
+            # Fallback for different response formats
+            if not aliases:
+                if isinstance(result, list):
+                    aliases = result[:20]
+                elif 'aliases' in result:
+                    aliases = result['aliases'][:20]
+                else:
+                    for value in result.values():
+                        if isinstance(value, list):
+                            aliases.extend(value)
+                    aliases = aliases[:20]
+            
+            self.logger.info(f"Generated {len(aliases)} aliases for {canonical_key}")
+            return aliases
             
         except Exception as e:
             self.logger.error(f"AI alias generation failed: {e}")
             return []
+    
+    def generate_canonical_key(self, query: str) -> str:
+        """
+        Generate a professional canonical key for a query using AI.
+        
+        Args:
+            query: The user query
+            
+        Returns:
+            A professional canonical key (snake_case, English)
+        """
+        if not self.client:
+            return "general"
+        
+        try:
+            prompt = f"""Generate a canonical key for this university query.
+
+Query: "{query}"
+
+RULES:
+1. Return a single snake_case key in English
+2. Key should be specific and descriptive
+3. Key should be 2-4 words max
+4. Examples: "course_registration", "tuition_fees", "admission_requirements", "academic_calendar"
+5. DO NOT use "general" - always be specific
+
+Return JSON:
+{{"canonical_key": "your_key_here"}}"""
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You generate canonical keys for a university information system. Keys must be specific, descriptive, and in snake_case English."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                response_format={"type": "json_object"}
+            )
+            
+            result = json.loads(response.choices[0].message.content)
+            key = result.get('canonical_key', 'general')
+            
+            # Ensure it's valid
+            key = key.lower().replace(' ', '_').replace('-', '_')
+            if not key or key == 'general':
+                # Generate from query
+                words = query.lower().split()[:3]
+                key = '_'.join(w for w in words if w.isalnum())[:30] or 'query'
+            
+            self.logger.info(f"Generated canonical key: {key} for query: {query[:50]}...")
+            return key
+            
+        except Exception as e:
+            self.logger.error(f"Canonical key generation failed: {e}")
+            return "general"

@@ -1,6 +1,9 @@
 """
-Alias service for mapping student questions to canonical Redis keys.
+Alias service for JUST University Assistant.
+خدمة الأسماء المستعارة لمساعد جامعة العلوم والتكنولوجيا
+
 Handles normalization, multilingual support, alias generation and validation.
+NEVER uses 'general' - always generates specific keys.
 """
 import re
 import unicodedata
@@ -12,31 +15,42 @@ class AliasService:
     """
     Maps student queries to canonical Redis keys and generates aliases.
     
-    Workflow:
-    1. Normalize & pre-process input
-    2. Map to canonical key
-    3. Generate aliases
-    4. Validate aliases
+    PHILOSOPHY:
+    - NEVER use 'general' as a key
+    - Generate specific, descriptive keys
+    - Support Arabic and English
     """
     
-    # Canonical keys that exist in the system
+    # Canonical keys that exist in the system (extensible)
     CANONICAL_KEYS = {
         'plan_software_engineering',
         'plan_computer_science',
         'plan_data_science',
-        'registration',
-        'fees',
+        'plan_electrical_engineering',
+        'plan_mechanical_engineering',
+        'plan_civil_engineering',
+        'course_registration',
+        'tuition_fees',
+        'payment_methods',
         'admissions',
+        'admission_requirements',
         'academic_calendar',
-        'schedules',
-        'courses_schedule',
+        'exam_schedule',
+        'course_schedule',
         'student_services',
-        'admission_rules',
         'scholarships',
-        'housing',
+        'financial_aid',
+        'student_housing',
         'departments',
-        'library',
-        'general'
+        'faculties',
+        'library_services',
+        'graduation_requirements',
+        'gpa_calculation',
+        'transfer_students',
+        'international_students',
+        'campus_facilities',
+        'contact_info',
+        'university_info'
     }
     
     # Arabic to English mappings for common terms
@@ -65,50 +79,79 @@ class AliasService:
         'مكتبة': 'library'
     }
     
-    # Keyword mappings for canonical key detection
+    # Keyword mappings for canonical key detection (extended)
     KEYWORD_MAPPINGS = {
         'plan_software_engineering': [
             'software engineering', 'هندسة البرمجيات', 'se plan', 'se curriculum', 
-            'خطة se', 'software engineer', 'هندسة سوفت وير'
+            'خطة se', 'software engineer', 'هندسة سوفت وير', 'سوفت وير', 'برمجيات'
         ],
         'plan_computer_science': [
             'computer science', 'علوم الحاسوب', 'cs plan', 'cs curriculum', 
-            'خطة cs', 'علوم حاسوب'
+            'خطة cs', 'علوم حاسوب', 'كمبيوتر ساينس'
         ],
         'plan_data_science': [
-            'data science', 'علوم البيانات', 'ds plan', 'ds curriculum', 'خطة ds'
+            'data science', 'علوم البيانات', 'ds plan', 'ds curriculum', 'خطة ds',
+            'بيانات', 'داتا ساينس'
         ],
-        'registration': [
-            'register', 'registration', 'تسجيل', 'enroll', 'enrollment', 'تسجيل المواد'
+        'course_registration': [
+            'register', 'registration', 'تسجيل', 'enroll', 'enrollment', 'تسجيل المواد',
+            'سجل', 'اسجل', 'كيف اسجل', 'طريقة التسجيل', 'موعد التسجيل'
         ],
-        'fees': [
-            'fee', 'fees', 'مصاريف', 'رسوم', 'payment', 'cost', 'tuition', 'price', 'تكلفة'
+        'tuition_fees': [
+            'fee', 'fees', 'مصاريف', 'رسوم', 'payment', 'cost', 'tuition', 'price', 
+            'تكلفة', 'كم الرسوم', 'رسوم الجامعة', 'سعر الساعة', 'ساعة معتمدة'
         ],
         'admissions': [
-            'admission', 'admissions', 'قبول', 'قبولات', 'apply', 'application', 'طلب قبول'
+            'admission', 'admissions', 'قبول', 'قبولات', 'apply', 'application', 
+            'طلب قبول', 'شروط القبول', 'معدل القبول', 'acceptance'
         ],
         'academic_calendar': [
             'calendar', 'تقويم', 'academic calendar', 'semester dates', 'مواعيد الفصل', 
-            'semester', 'تقويم أكاديمي'
+            'semester', 'تقويم أكاديمي', 'بداية الفصل', 'نهاية الفصل', 'متى يبدأ'
         ],
-        'schedules': [
+        'exam_schedule': [
+            'exam', 'امتحان', 'امتحانات', 'جدول الامتحانات', 'final exam', 'midterm',
+            'نص الفصل', 'نهائي', 'موعد الامتحان'
+        ],
+        'course_schedule': [
             'schedule', 'جدول', 'schedules', 'timetable', 'class schedule', 'مواعيد', 
-            'جدول الحصص', 'courses schedule'
+            'جدول الحصص', 'courses schedule', 'جدول المحاضرات'
         ],
         'student_services': [
-            'student service', 'خدمات الطالب', 'student services', 'support', 'خدمات'
+            'student service', 'خدمات الطالب', 'student services', 'support', 'خدمات',
+            'شؤون الطلاب', 'عمادة شؤون الطلبة'
         ],
         'scholarships': [
-            'scholarship', 'منح', 'scholarships', 'financial aid', 'منحة'
+            'scholarship', 'منح', 'scholarships', 'financial aid', 'منحة', 'منحة دراسية',
+            'دعم مالي', 'مساعدة مالية'
         ],
-        'housing': [
-            'housing', 'سكن', 'dorm', 'accommodation', 'residence', 'سكن طلابي'
+        'student_housing': [
+            'housing', 'سكن', 'dorm', 'accommodation', 'residence', 'سكن طلابي',
+            'سكن الجامعة', 'dormitory', 'اسكان'
         ],
         'departments': [
-            'department', 'أقسام', 'departments', 'faculty', 'قسم'
+            'department', 'أقسام', 'departments', 'قسم', 'الأقسام الأكاديمية'
         ],
-        'library': [
-            'library', 'مكتبة', 'libraries'
+        'faculties': [
+            'faculty', 'كلية', 'كليات', 'faculties', 'college'
+        ],
+        'library_services': [
+            'library', 'مكتبة', 'libraries', 'مكتبة الجامعة', 'استعارة كتب'
+        ],
+        'graduation_requirements': [
+            'graduation', 'تخرج', 'متطلبات التخرج', 'graduate', 'شروط التخرج'
+        ],
+        'gpa_calculation': [
+            'gpa', 'معدل', 'المعدل التراكمي', 'حساب المعدل', 'grade point'
+        ],
+        'transfer_students': [
+            'transfer', 'انتقال', 'تحويل', 'نقل', 'طالب محول', 'معادلة'
+        ],
+        'international_students': [
+            'international', 'وافد', 'وافدين', 'طلاب دوليين', 'أجنبي', 'foreign'
+        ],
+        'campus_facilities': [
+            'campus', 'facilities', 'مرافق', 'حرم جامعي', 'مباني', 'building'
         ]
     }
     
@@ -195,13 +238,14 @@ class AliasService:
     def map_to_canonical_key(self, normalized_query: str, language: str) -> str:
         """
         Map normalized input to canonical Redis key.
+        NEVER returns 'general' - always generates a specific key.
         
         Args:
             normalized_query: Normalized query
             language: Detected language
             
         Returns:
-            Canonical key
+            Canonical key (never 'general')
         """
         query_lower = normalized_query.lower()
         
@@ -211,9 +255,79 @@ class AliasService:
                 self.logger.debug(f"Mapped '{normalized_query}' to {canonical_key}")
                 return canonical_key
         
-        # Default to 'general' if no match
-        self.logger.debug(f"No specific mapping for '{normalized_query}', using 'general'")
-        return 'general'
+        # Generate a key from the query instead of using 'general'
+        generated_key = self._generate_key_from_query(normalized_query, language)
+        self.logger.debug(f"Generated key '{generated_key}' for '{normalized_query}'")
+        return generated_key
+    
+    def _generate_key_from_query(self, query: str, language: str) -> str:
+        """
+        Generate a canonical key from the query when no keyword matches.
+        
+        Args:
+            query: The normalized query
+            language: Detected language
+            
+        Returns:
+            A snake_case canonical key
+        """
+        # Remove common Arabic stop words
+        arabic_stop_words = {'في', 'من', 'على', 'إلى', 'عن', 'مع', 'هل', 'ما', 'كيف', 'متى', 'أين', 'لماذا', 'هذا', 'هذه', 'التي', 'الذي', 'أن', 'ان', 'كان', 'يكون', 'هي', 'هو', 'انا', 'انت', 'نحن', 'شو', 'وين', 'كيف', 'ليش'}
+        english_stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'dare', 'ought', 'used', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just', 'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself', 'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves'}
+        
+        stop_words = arabic_stop_words | english_stop_words
+        
+        # Split query and filter
+        words = query.lower().split()
+        meaningful_words = []
+        
+        for word in words:
+            # Remove punctuation
+            clean_word = re.sub(r'[^\w\s]', '', word)
+            if clean_word and clean_word not in stop_words and len(clean_word) > 1:
+                meaningful_words.append(clean_word)
+        
+        # Take first 3 meaningful words
+        key_words = meaningful_words[:3]
+        
+        if not key_words:
+            # Fallback: use first significant word
+            for word in words:
+                clean = re.sub(r'[^\w]', '', word)
+                if clean and len(clean) > 2:
+                    return clean.lower()[:20]
+            return 'university_query'
+        
+        # Convert Arabic to transliteration for key
+        key = '_'.join(key_words)
+        
+        # Ensure valid key format
+        key = re.sub(r'[^a-z0-9_\u0600-\u06FF]', '', key.lower())
+        key = re.sub(r'_+', '_', key).strip('_')
+        
+        # If key has Arabic, transliterate to English-like
+        if any('\u0600' <= c <= '\u06FF' for c in key):
+            key = self._transliterate_arabic(key)
+        
+        return key[:30] if key else 'university_query'
+    
+    def _transliterate_arabic(self, text: str) -> str:
+        """Simple Arabic to Latin transliteration for keys."""
+        trans_map = {
+            'ا': 'a', 'أ': 'a', 'إ': 'i', 'آ': 'a', 'ب': 'b', 'ت': 't', 'ث': 'th',
+            'ج': 'j', 'ح': 'h', 'خ': 'kh', 'د': 'd', 'ذ': 'th', 'ر': 'r', 'ز': 'z',
+            'س': 's', 'ش': 'sh', 'ص': 's', 'ض': 'd', 'ط': 't', 'ظ': 'z', 'ع': 'a',
+            'غ': 'gh', 'ف': 'f', 'ق': 'q', 'ك': 'k', 'ل': 'l', 'م': 'm', 'ن': 'n',
+            'ه': 'h', 'و': 'w', 'ي': 'y', 'ى': 'a', 'ة': 'a', 'ء': '', 'ئ': 'y',
+            'ؤ': 'w', 'ـ': ''
+        }
+        result = ''
+        for char in text:
+            if char in trans_map:
+                result += trans_map[char]
+            elif char.isalnum() or char == '_':
+                result += char
+        return result
     
     # ========================================
     # ALIAS GENERATION
@@ -468,13 +582,14 @@ class AliasService:
     def process_query(self, query: str) -> Dict[str, any]:
         """
         Complete workflow: Normalize, map, generate aliases, validate.
+        NEVER returns 'general' as canonical key.
         
         Args:
             query: Student query
             
         Returns:
             {
-                "canonical_key": "...",
+                "canonical_key": "...",  # Always specific, never 'general'
                 "aliases": [...],
                 "language": "..."
             }
@@ -483,19 +598,19 @@ class AliasService:
         normalized, language = self.normalize_input(query)
         self.logger.debug(f"Normalized query: '{normalized}', Language: {language}")
         
-        # Step 2: Canonical Key Mapping
+        # Step 2: Canonical Key Mapping (never returns 'general')
         canonical_key = self.map_to_canonical_key(normalized, language)
         
+        # Add to known keys if new
         if canonical_key not in self.CANONICAL_KEYS:
-            self.logger.warning(f"Invalid canonical key: {canonical_key}, using 'general'")
-            canonical_key = 'general'
+            self.CANONICAL_KEYS.add(canonical_key)
         
         self.logger.debug(f"Mapped to canonical key: {canonical_key}")
         
         # Step 3: Alias Generation
         aliases = self.generate_aliases(canonical_key, query, language)
         
-        # Step 4: Validation
+        # Step 4: Validation (relaxed for dynamic keys)
         validated_aliases = self.validate_aliases(canonical_key, aliases)
         
         self.logger.info(f"Generated {len(validated_aliases)} validated aliases for key: {canonical_key}")

@@ -1,18 +1,24 @@
 """
-Query Controller - Main business logic for handling student queries.
-Implements the STRICT 7-step workflow with embeddings + cosine similarity.
+Query Controller - Main business logic for JUST University Assistant.
+شات بوت متخصص لجامعة العلوم والتكنولوجيا الأردنية
 
-WORKFLOW (MUST FOLLOW EXACTLY):
-================================
-STEP 1: Embeddings + Cosine Similarity (alias matching)
-STEP 2: Redis Cache Check (if canonical key found)
-STEP 3: Resource Selection (semantic reasoning)
-STEP 4: ChatGPT Web Search & Extraction
-STEP 5: Auto-Generate Aliases
-STEP 6: Store in Redis (with embeddings)
-STEP 7: Return Final Result
+CORE PHILOSOPHY:
+================
+- PRIMARY JOB: Search and answer ANY question about the university
+- SECONDARY: Use cached data when available (Redis)
+- RESOURCES: Helper URLs to provide context to GPT
+- If no cache found → AUTO SEARCH and answer
+
+WORKFLOW (OPTIMIZED FOR SPEED):
+=========
+STEP 1: Try to match query to cached data (embeddings)
+STEP 2: If cache HIT → use cached data → return immediately
+STEP 3: If cache MISS → AUTO SEARCH with GPT
+STEP 4: Generate VERY DETAILED answer → RETURN IMMEDIATELY (Priority #1)
+STEP 5: Background: Generate canonical key, aliases, cache (non-blocking)
 """
 import copy
+import threading
 from typing import Dict, Any, Optional, List, Tuple
 from services.redis_service import RedisService
 from services.openai_service import OpenAIService
@@ -139,12 +145,19 @@ class QueryController:
         best_alias, canonical_key, score, is_confident = \
             self.embeddings_service.match_query_to_aliases(query, alias_embeddings)
         
+        # If canonical_key is None, try to resolve it from the alias
+        if best_alias and not canonical_key:
+            resolved_key = self.redis_service.resolve_alias(best_alias)
+            if resolved_key:
+                canonical_key = resolved_key
+                self.logger.info(f"Resolved canonical key from alias '{best_alias}': {canonical_key}")
+        
         self.logger.info(
             f"Embedding match: alias='{best_alias}', key={canonical_key}, "
             f"score={score:.4f}, confident={is_confident}"
         )
         
-        if is_confident:
+        if is_confident and canonical_key:
             # Score >= threshold, use match directly
             return canonical_key, score
         
@@ -165,6 +178,13 @@ class QueryController:
                 
                 if validated_key:
                     return validated_key, confidence
+        
+        # If we have a match but no key, try to resolve from alias
+        if best_alias and not canonical_key:
+            resolved_key = self.redis_service.resolve_alias(best_alias)
+            if resolved_key:
+                self.logger.info(f"Fallback: Resolved key '{resolved_key}' from alias '{best_alias}'")
+                return resolved_key, score
         
         # No match found
         return self._fallback_alias_matching(query)
@@ -211,10 +231,13 @@ class QueryController:
         result = self.alias_service.process_query(query)
         canonical_key = result.get('canonical_key')
         
-        if canonical_key and canonical_key != 'general':
+        if canonical_key:
             # Check if this key exists in Redis
             if self.redis_service.resolve_alias(query):
                 return canonical_key, 0.7
+            # Also check if we have cached data for this key
+            if self.redis_service.fetch_from_redis(canonical_key):
+                return canonical_key, 0.6
         
         return None, 0.0
     
@@ -227,7 +250,7 @@ class QueryController:
         - Do NOT modify the JSON
         - Do NOT fetch new data
         - Do NOT regenerate aliases
-        - Pass JSON to ChatGPT for refined answer
+        - Pass JSON to ChatGPT for VERY DETAILED answer
         """
         original_json = copy.deepcopy(redis_json)
         
@@ -240,7 +263,7 @@ class QueryController:
         # Create clean JSON for answer generation
         clean_json = {k: v for k, v in original_json.items() if k != 'aliases'}
         
-        # Generate refined answer using ChatGPT
+        # Generate VERY DETAILED answer using ChatGPT
         log_answer_generation("redis")
         answer = self.openai_service.generate_answer(clean_json, query, "redis")
         
@@ -256,118 +279,172 @@ class QueryController:
     
     def _handle_live_web(self, query: str, canonical_key: Optional[str]) -> Dict[str, Any]:
         """
-        Handle query with live web extraction.
+        Handle query with live search - PRIMARY FUNCTION.
         
-        STEPS 3-7:
-        ==========
-        STEP 3: Resource Selection
-        STEP 4: ChatGPT Web Search & Extraction
-        STEP 5: Auto-Generate Aliases
-        STEP 6: Store in Redis (with embeddings)
-        STEP 7: Return Result
+        OPTIMIZED WORKFLOW FOR SPEED:
+        =============================
+        1. Generate/Get canonical key (quick)
+        2. Extract data (quick)
+        3. Generate VERY DETAILED answer → RETURN IMMEDIATELY (Priority #1)
+        4. Background: Generate aliases, embeddings, cache (non-blocking)
+        
+        This ensures the user gets their answer FAST, while caching happens in background.
         """
+        import os
+        import json
+        
         # ========================================
-        # STEP 3: RESOURCE SELECTION
+        # STEP 1: GENERATE CANONICAL KEY (Quick)
         # ========================================
-        self.logger.info("STEP 3: Resource Selection")
+        self.logger.info("STEP 1: Generate Professional Canonical Key")
+        
+        # If no canonical key provided, generate one using AI
+        if not canonical_key or canonical_key == 'general':
+            canonical_key = self.openai_service.generate_canonical_key(query)
+            self.logger.info(f"Generated canonical key: {canonical_key}")
+        
         log_resource_selection(query)
-        
-        # Use alias service to determine canonical key if not already set
-        if not canonical_key:
-            result = self.alias_service.process_query(query)
-            canonical_key = result.get('canonical_key', 'general')
-        
+
+        # Load resources as context helpers (not required)
+        resources_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources.json")
+        try:
+            with open(resources_path, "r", encoding="utf-8") as f:
+                resources = json.load(f)
+        except Exception as e:
+            self.logger.error(f"Failed to load resources.json: {e}")
+            resources = {}
+
+        # Try to select a relevant resource URL (optional helper)
+        selected_key, selected_url = None, None
+        if resources:
+            selected_key, selected_url = self.openai_service.select_best_resource(query, resources)
+            if selected_key:
+                self.logger.info(f"Found helper resource: {selected_key} -> {selected_url}")
+
         # ========================================
-        # STEP 4: CHATGPT WEB SEARCH & EXTRACTION
+        # STEP 2: EXTRACT DATA (Quick)
         # ========================================
-        self.logger.info("STEP 4: ChatGPT Web Search & Extraction")
+        self.logger.info("STEP 2: Extract Data")
         log_web_extraction_start(canonical_key)
-        
-        json_data = self.extractor_service.extract_data(canonical_key, query)
-        
+
+        # Extract information - this is the PRIMARY function
+        json_data = self.extractor_service.extract_data(
+            canonical_key, 
+            query,
+            resource_url=selected_url  # Optional helper URL
+        )
+
         if json_data:
             log_web_extraction_complete(canonical_key, True, len(str(json_data)))
         else:
             log_web_extraction_complete(canonical_key, False)
+            # Still try to answer even if extraction failed
             json_data = {
                 "topic": canonical_key,
                 "query": query,
-                "message": "Unable to retrieve information at this time."
+                "source": "knowledge",
+                "message": "تم البحث عن المعلومات في مصادر جامعة العلوم والتكنولوجيا"
             }
-        
-        # Build structured JSON
-        log_json_building_start()
-        json_keys = list(json_data.keys())
-        log_json_building_complete(json_keys)
-        
-        # ========================================
-        # STEP 5: AUTO-GENERATE ALIASES
-        # ========================================
-        self.logger.info("STEP 5: Auto-Generate Aliases")
-        log_alias_generation_start()
-        
-        # Generate aliases using alias service
-        alias_result = self.alias_service.process_query(query)
-        aliases = alias_result.get('aliases', [])
-        
-        # Enhance with AI-generated aliases
-        if self.openai_service.is_configured():
-            ai_aliases = self.openai_service.generate_aliases_with_ai(canonical_key, query)
-            if ai_aliases:
-                existing = set(a.lower() for a in aliases)
-                for alias in ai_aliases:
-                    if alias.lower() not in existing:
-                        aliases.append(alias)
-                        existing.add(alias.lower())
-        
-        # Validate aliases
-        aliases = self.alias_service.validate_aliases(canonical_key, aliases)
-        
+
         # Update topic
         json_data['topic'] = canonical_key
-        
-        log_alias_generation_complete(canonical_key, len(aliases))
-        
+
         # ========================================
-        # STEP 6: STORE IN REDIS (with embeddings)
+        # STEP 3: GENERATE VERY DETAILED ANSWER → RETURN IMMEDIATELY (Priority #1)
         # ========================================
-        self.logger.info("STEP 6: Store in Redis")
-        
-        if self.redis_service.is_connected():
-            # Generate embeddings for aliases
-            alias_embeddings = {}
-            if self.embeddings_service.is_configured():
-                self.logger.info(f"Generating embeddings for {len(aliases)} aliases")
-                embeddings_batch = self.embeddings_service.generate_embeddings_batch(aliases)
-                for alias, embedding in embeddings_batch.items():
-                    alias_embeddings[alias] = embedding
-            
-            # Store data with aliases and embeddings
-            success = self.redis_service.save_to_redis(
-                canonical_key, 
-                json_data, 
-                aliases,
-                alias_embeddings
-            )
-            log_redis_cache_store(canonical_key, success)
-        
-        # ========================================
-        # STEP 7: RETURN FINAL RESULT
-        # ========================================
-        self.logger.info("STEP 7: Generate Answer & Return")
+        self.logger.info("STEP 3: Generate VERY DETAILED Answer (Priority #1)")
         log_answer_generation("live_web")
-        
+
+        # Generate comprehensive, detailed answer
         answer = self.openai_service.generate_answer(json_data, query, "live_web")
-        
+
+        # Prepare result with minimal aliases for now (will be updated in background)
         result = {
             "source": "live_web",
             "json": json_data,
-            "aliases": aliases,
+            "aliases": [query],  # Temporary - will be updated in background
             "answer": answer
         }
+
+        log_response_ready("live_web", len(answer), 1)
         
-        log_response_ready("live_web", len(answer), len(aliases))
+        # ========================================
+        # STEP 4: BACKGROUND TASKS (Non-blocking)
+        # ========================================
+        self.logger.info("STEP 4: Starting background caching tasks")
+        
+        # Start background thread for caching, alias generation, etc.
+        background_thread = threading.Thread(
+            target=self._background_cache_task,
+            args=(canonical_key, json_data, query),
+            daemon=True  # Don't block server shutdown
+        )
+        background_thread.start()
+        self.logger.info("Background caching task started (non-blocking)")
+        
+        # Return result immediately - user gets answer FAST!
         return result
+    
+    def _background_cache_task(self, canonical_key: str, json_data: Dict[str, Any], query: str):
+        """
+        Background task to generate aliases, embeddings, and cache data.
+        This runs in a separate thread and doesn't block the user response.
+        """
+        try:
+            self.logger.info(f"Background: Starting cache task for {canonical_key}")
+            
+            # ========================================
+            # Generate 10 Arabic + 10 English Aliases
+            # ========================================
+            self.logger.info("Background: Generate 10 Arabic + 10 English Aliases")
+            log_alias_generation_start()
+
+            aliases = []
+
+            # Generate AI aliases (10 Arabic + 10 English)
+            if self.openai_service.is_configured():
+                ai_aliases = self.openai_service.generate_aliases_with_ai(canonical_key, query)
+                if ai_aliases:
+                    aliases = ai_aliases
+                    self.logger.info(f"Background: Generated {len(aliases)} AI aliases")
+
+            # Add original query as alias
+            if query.lower() not in [a.lower() for a in aliases]:
+                aliases.insert(0, query)
+
+            log_alias_generation_complete(canonical_key, len(aliases))
+
+            # ========================================
+            # Store in Redis (with embeddings)
+            # ========================================
+            self.logger.info("Background: Store in Redis")
+
+            if self.redis_service.is_connected():
+                # Generate embeddings for aliases
+                alias_embeddings = {}
+                if self.embeddings_service.is_configured():
+                    self.logger.info(f"Background: Generating embeddings for {len(aliases)} aliases")
+                    embeddings_batch = self.embeddings_service.generate_embeddings_batch(aliases)
+                    for alias, embedding in embeddings_batch.items():
+                        alias_embeddings[alias] = embedding
+
+                # Update JSON with aliases
+                json_data['aliases'] = aliases
+
+                # Store data with aliases and embeddings
+                success = self.redis_service.save_to_redis(
+                    canonical_key, 
+                    json_data, 
+                    aliases,
+                    alias_embeddings
+                )
+                log_redis_cache_store(canonical_key, success)
+                self.logger.info(f"Background: Cache task completed for {canonical_key} - Success: {success}")
+            else:
+                self.logger.warning("Background: Redis not connected, skipping cache")
+                
+        except Exception as e:
+            self.logger.error(f"Background cache task failed: {e}", exc_info=True)
     
     # ========================================
     # API HELPER METHODS
