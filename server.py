@@ -232,14 +232,12 @@ def handle_query():
     """
     Main query endpoint.
     
-    WORKFLOW:
+    OPTIMIZED WORKFLOW:
     1. Embeddings + Cosine Similarity (alias matching)
     2. Redis Cache Check (if canonical key found)
-    3. Resource Selection (semantic reasoning)
-    4. ChatGPT Web Search & Extraction
-    5. Auto-Generate Aliases
-    6. Store in Redis (with embeddings)
-    7. Return {source, json, aliases, answer}
+    3. Extract Data (quick)
+    4. Generate VERY DETAILED Answer → Return IMMEDIATELY (Priority #1)
+    5. Background: Generate aliases, embeddings, cache (non-blocking)
     
     Expected request body:
     {
