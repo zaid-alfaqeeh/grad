@@ -484,6 +484,83 @@ Respond in JSON:
             self.logger.error(f"Answer generation failed: {e}")
             return self._generate_fallback_answer(json_data, query)
     
+    def generate_answer_stream(self, json_data: Dict[str, Any], query: str, source: str):
+        """
+        Generate a streaming answer from JSON data.
+        Yields chunks of text as they are generated.
+        
+        Args:
+            json_data: The structured JSON dataset
+            query: Original student query
+            source: Data source ("redis" or "live_web")
+            
+        Yields:
+            Text chunks as they are generated
+        """
+        if not self.client:
+            # Fallback: yield the fallback answer all at once
+            fallback = self._generate_fallback_answer(json_data, query)
+            yield fallback
+            return
+        
+        try:
+            prompt = f"""أنت مساعد متخصص في جامعة العلوم والتكنولوجيا الأردنية (JUST).
+قم بإنشاء إجابة مفصلة جداً ومفيدة للطالب بناءً على هذه البيانات.
+
+سؤال الطالب: "{query}"
+
+البيانات المتوفرة:
+{json.dumps(json_data, indent=2, ensure_ascii=False)}
+
+القواعد المهمة:
+1. قدم إجابة مفصلة جداً وشاملة - لا تكن مختصراً
+2. اشرح كل نقطة بشكل واضح ومفصل
+3. استخدم عناوين فرعية، نقاط، وقوائم مرقمة لتنظيم المعلومات
+4. أضف أمثلة وتوضيحات عملية حيثما أمكن
+5. إذا كانت هناك خطوات، اشرح كل خطوة بالتفصيل
+6. إذا كانت هناك رسوم أو تكاليف، اشرحها بالتفصيل
+7. إذا كانت هناك متطلبات، اشرح كل متطلب
+8. أضف نصائح مفيدة للطالب
+9. اقترح زيارة الموقع الرسمي للمزيد من التفاصيل: https://www.just.edu.jo
+10. لا تذكر أي تفاصيل تقنية (Redis، caching، embeddings)
+11. كن ودوداً ومهذباً ومهتماً بمساعدة الطالب
+12. استخدم اللغة العربية بشكل صحيح وواضح
+
+قم بإنشاء إجابة شاملة ومفصلة تغطي جميع جوانب السؤال."""
+
+            stream = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """أنت مساعد متخصص في جامعة العلوم والتكنولوجيا الأردنية (JUST).
+مهمتك تقديم إجابات مفصلة جداً ومفيدة للطلاب.
+كن شاملاً ومفصلاً في إجاباتك - لا تكن مختصراً.
+استخدم تنظيم واضح مع عناوين فرعية ونقاط وقوائم.
+قدم أمثلة وتوضيحات عملية.
+كن ودوداً ومهتماً بمساعدة الطلاب."""
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                temperature=0.7,
+                max_tokens=2000,
+                stream=True  # Enable streaming
+            )
+            
+            # Yield chunks as they arrive
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+                    
+        except Exception as e:
+            self.logger.error(f"Streaming answer generation failed: {e}")
+            # Fallback: yield the fallback answer
+            fallback = self._generate_fallback_answer(json_data, query)
+            yield fallback
+    
     def _generate_fallback_answer(self, json_data: Dict[str, Any], query: str) -> str:
         """Generate a basic answer without AI."""
         parts = ["Here's the information you're looking for:\n"]

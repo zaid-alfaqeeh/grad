@@ -8,7 +8,7 @@ SYSTEM ARCHITECTURE:
 - Aliases: 10 Arabic + 10 English per topic
 - Resources: Helper URLs passed to GPT for context
 """
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, Response, stream_with_context
 from flask_cors import CORS
 from controllers.query_controller import QueryController, OutputValidator
 from services.redis_service import RedisService
@@ -266,6 +266,75 @@ def handle_query():
     except Exception as e:
         log_error('handle_query', e)
         log_api_request('POST', '/query', 500)
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+
+
+@app.route('/query/stream', methods=['POST'])
+def handle_query_stream():
+    """
+    Streaming query endpoint using Server-Sent Events (SSE).
+    
+    Returns a streaming response where the answer is sent chunk by chunk
+    as it's generated, making the response appear faster to users.
+    
+    Expected request body:
+    {
+        "query": "student question",
+        "redis_json": {...}  // optional
+    }
+    """
+    try:
+        log_api_request('POST', '/query/stream')
+        data = request.get_json()
+        if not data or 'query' not in data:
+            log_api_request('POST', '/query/stream', 400)
+            return jsonify({'error': 'Missing required field: query'}), 400
+        
+        query = data['query']
+        redis_json = data.get('redis_json', None)
+        
+        def generate():
+            try:
+                # Process query to get JSON data (but don't generate answer yet)
+                # We'll extract the data first, then stream the answer
+                result_data = query_controller.process_query_for_streaming(query, redis_json)
+                
+                # Send metadata first (source, json structure)
+                yield f"data: {json.dumps({'type': 'metadata', 'data': result_data})}\n\n"
+                
+                # Stream the answer
+                json_data = result_data.get('json', {})
+                source = result_data.get('source', 'live_web')
+                clean_json = {k: v for k, v in json_data.items() if k != 'aliases'}
+                
+                # Stream answer chunks
+                openai_service = query_controller.openai_service
+                for chunk in openai_service.generate_answer_stream(clean_json, query, source):
+                    if chunk:
+                        # JSON encoding will handle all escaping automatically
+                        yield f"data: {json.dumps({'type': 'chunk', 'content': chunk}, ensure_ascii=False)}\n\n"
+                
+                # Send completion signal
+                yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                
+            except Exception as e:
+                log_error('handle_query_stream', e)
+                error_msg = str(e).replace('\n', '\\n')
+                yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
+        
+        return Response(
+            stream_with_context(generate()),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no',
+                'Connection': 'keep-alive'
+            }
+        )
+        
+    except Exception as e:
+        log_error('handle_query_stream', e)
+        log_api_request('POST', '/query/stream', 500)
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
 

@@ -382,6 +382,9 @@
         line-height: 1.8;
         font-size: 1rem;
         white-space: pre-wrap;
+        max-height: 600px;
+        overflow-y: auto;
+        word-wrap: break-word;
       }
 
       .toggle-json-btn {
@@ -681,29 +684,113 @@
         sendBtn.textContent = "⏳ جاري البحث...";
 
         try {
-          const response = await fetch(`${API_BASE}/query`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              query: query,
-            }),
-          });
-
-          const data = await response.json();
-
-          if (!response.ok) {
-            throw new Error(data.error || "فشل في الحصول على الإجابة");
-          }
-
-          displayResponse(data);
+          // Use streaming endpoint for faster response
+          await sendQueryStream(query);
         } catch (error) {
           displayError(error.message);
         } finally {
           document.getElementById("loading").classList.remove("active");
           sendBtn.disabled = false;
           sendBtn.textContent = "🔍 ابحث";
+        }
+      }
+
+      async function sendQueryStream(query) {
+        const response = await fetch(`${API_BASE}/query/stream`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            query: query,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "فشل في الحصول على الإجابة");
+        }
+
+        // Prepare response section
+        const responseSection = document.getElementById("responseSection");
+        const sourceBadge = document.getElementById("sourceBadge");
+        const answerBox = document.getElementById("answerBox");
+        const jsonBox = document.getElementById("jsonBox");
+
+        // Clear previous content
+        answerBox.textContent = "";
+        let metadata = null;
+        let fullAnswer = "";
+
+        // Read the stream
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) break;
+
+          // Decode chunk and add to buffer
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete SSE messages
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.substring(6));
+
+                if (data.type === "metadata") {
+                  metadata = data.data;
+
+                  // Update source badge
+                  if (metadata.source === "redis") {
+                    sourceBadge.textContent = "⚡ من الكاش";
+                    sourceBadge.className = "source-badge redis";
+                  } else {
+                    sourceBadge.textContent = "🌐 بحث مباشر";
+                    sourceBadge.className = "source-badge live";
+                  }
+
+                  // Display JSON
+                  jsonBox.textContent = JSON.stringify(metadata.json, null, 2);
+
+                  // Show response section immediately
+                  responseSection.classList.add("show");
+                  responseSection.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  });
+
+                  // Hide loading
+                  document.getElementById("loading").classList.remove("active");
+                } else if (data.type === "chunk") {
+                  // Append chunk to answer (content is already properly formatted)
+                  fullAnswer += data.content;
+                  answerBox.textContent = fullAnswer;
+
+                  // Auto-scroll to bottom
+                  answerBox.scrollTop = answerBox.scrollHeight;
+                } else if (data.type === "done") {
+                  // Streaming complete
+                  console.log("Streaming complete");
+                } else if (data.type === "error") {
+                  throw new Error(data.message);
+                }
+              } catch (e) {
+                console.error("Error parsing SSE data:", e);
+              }
+            }
+          }
+        }
+
+        // Ensure we have the full answer displayed
+        if (fullAnswer) {
+          answerBox.textContent = fullAnswer;
         }
       }
 

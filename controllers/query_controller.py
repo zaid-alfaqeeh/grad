@@ -50,6 +50,141 @@ class QueryController:
         self.embeddings_service = EmbeddingsService()
         self.logger = get_logger()
     
+    def process_query_for_streaming(self, query: str, redis_json: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Process query and prepare data for streaming.
+        Returns the JSON data and metadata without generating the answer.
+        The answer will be streamed separately.
+        
+        Args:
+            query: Student's question
+            redis_json: Optional cached JSON
+            
+        Returns:
+            {
+                "source": "redis" | "live_web",
+                "json": {...},
+                "aliases": [...]
+            }
+        """
+        has_provided_json = redis_json is not None and redis_json != {}
+        log_query_received(query, has_provided_json)
+        
+        # If JSON provided directly, use it
+        if has_provided_json:
+            self.logger.info("Using provided Redis JSON (skip workflow)")
+            original_json = copy.deepcopy(redis_json)
+            aliases = original_json.get('aliases', [])
+            return {
+                "source": "redis",
+                "json": original_json,
+                "aliases": aliases
+            }
+        
+        # ========================================
+        # STEP 1: EMBEDDINGS + COSINE SIMILARITY
+        # ========================================
+        self.logger.info("STEP 1: Embeddings + Cosine Similarity matching")
+        
+        canonical_key, confidence = self._match_with_embeddings(query)
+        
+        if canonical_key:
+            # ========================================
+            # STEP 2: REDIS CACHE CHECK
+            # ========================================
+            self.logger.info(f"STEP 2: Redis cache check for key: {canonical_key}")
+            log_redis_check(True)
+            
+            cached_data = self.redis_service.fetch_from_redis(canonical_key)
+            
+            if cached_data:
+                log_redis_data_used(canonical_key)
+                self.logger.info(f"Cache HIT: Using cached data for {canonical_key}")
+                aliases = cached_data.get('aliases', [])
+                return {
+                    "source": "redis",
+                    "json": cached_data,
+                    "aliases": aliases
+                }
+            else:
+                self.logger.info(f"Cache MISS: Key {canonical_key} found but no data")
+        else:
+            log_redis_check(False)
+            self.logger.info("No matching alias found - proceeding to live extraction")
+        
+        # ========================================
+        # LIVE WEB EXTRACTION
+        # ========================================
+        return self._prepare_live_web_data(query, canonical_key)
+    
+    def _prepare_live_web_data(self, query: str, canonical_key: Optional[str]) -> Dict[str, Any]:
+        """
+        Prepare live web data for streaming (without generating answer).
+        Similar to _handle_live_web but returns data structure without answer.
+        """
+        import os
+        import json
+        
+        # Generate canonical key if needed
+        if not canonical_key or canonical_key == 'general':
+            canonical_key = self.openai_service.generate_canonical_key(query)
+            self.logger.info(f"Generated canonical key: {canonical_key}")
+        
+        log_resource_selection(query)
+
+        # Load resources
+        resources_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources.json")
+        try:
+            with open(resources_path, "r", encoding="utf-8") as f:
+                resources = json.load(f)
+        except Exception as e:
+            self.logger.error(f"Failed to load resources.json: {e}")
+            resources = {}
+
+        # Select resource URL
+        selected_key, selected_url = None, None
+        if resources:
+            selected_key, selected_url = self.openai_service.select_best_resource(query, resources)
+            if selected_key:
+                self.logger.info(f"Found helper resource: {selected_key} -> {selected_url}")
+
+        # Extract data
+        self.logger.info("Extracting data for streaming")
+        log_web_extraction_start(canonical_key)
+
+        json_data = self.extractor_service.extract_data(
+            canonical_key, 
+            query,
+            resource_url=selected_url
+        )
+
+        if json_data:
+            log_web_extraction_complete(canonical_key, True, len(str(json_data)))
+        else:
+            log_web_extraction_complete(canonical_key, False)
+            json_data = {
+                "topic": canonical_key,
+                "query": query,
+                "source": "knowledge",
+                "message": "تم البحث عن المعلومات في مصادر جامعة العلوم والتكنولوجيا"
+            }
+
+        json_data['topic'] = canonical_key
+
+        # Start background caching (non-blocking)
+        background_thread = threading.Thread(
+            target=self._background_cache_task,
+            args=(canonical_key, json_data, query),
+            daemon=True
+        )
+        background_thread.start()
+
+        return {
+            "source": "live_web",
+            "json": json_data,
+            "aliases": [query]  # Temporary
+        }
+    
     def process_query(self, query: str, redis_json: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Process a student query following the STRICT 7-step workflow.
