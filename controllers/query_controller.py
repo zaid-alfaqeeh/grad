@@ -18,6 +18,7 @@ STEP 4: Generate VERY DETAILED answer → RETURN IMMEDIATELY (Priority #1)
 STEP 5: Background: Generate canonical key, aliases, cache (non-blocking)
 """
 import copy
+import sys
 import threading
 from typing import Dict, Any, Optional, List, Tuple
 from services.redis_service import RedisService
@@ -31,7 +32,9 @@ from logger import (
     log_resource_selection, log_web_search, log_web_extraction_start,
     log_web_extraction_complete, log_json_building_start, log_json_building_complete,
     log_redis_cache_store, log_answer_generation, log_response_ready, log_error,
-    log_alias_generation_start, log_alias_generation_complete, get_logger
+    log_alias_generation_start, log_alias_generation_complete, get_logger,
+    log_embeddings_search, log_embeddings_result, log_canonical_key_generation,
+    log_background_task_start, log_background_task_complete, log_step
 )
 
 
@@ -68,11 +71,11 @@ class QueryController:
             }
         """
         has_provided_json = redis_json is not None and redis_json != {}
-        log_query_received(query, has_provided_json)
+        # Note: log_query_received is called in server.py
         
         # If JSON provided directly, use it
         if has_provided_json:
-            self.logger.info("Using provided Redis JSON (skip workflow)")
+            self.logger.info("📦 Using provided Redis JSON (skip workflow)")
             original_json = copy.deepcopy(redis_json)
             aliases = original_json.get('aliases', [])
             return {
@@ -84,22 +87,27 @@ class QueryController:
         # ========================================
         # STEP 1: EMBEDDINGS + COSINE SIMILARITY
         # ========================================
-        self.logger.info("STEP 1: Embeddings + Cosine Similarity matching")
+        log_step(1, "EMBEDDINGS + COSINE SIMILARITY", "Searching for matching aliases")
+        log_embeddings_search(query)
+        sys.stdout.flush()
         
         canonical_key, confidence = self._match_with_embeddings(query)
         
         if canonical_key:
+            log_embeddings_result(True, canonical_key, confidence)
+            
             # ========================================
             # STEP 2: REDIS CACHE CHECK
             # ========================================
-            self.logger.info(f"STEP 2: Redis cache check for key: {canonical_key}")
+            log_step(2, "REDIS CACHE CHECK", f"Key: {canonical_key}")
             log_redis_check(True)
             
             cached_data = self.redis_service.fetch_from_redis(canonical_key)
             
             if cached_data:
                 log_redis_data_used(canonical_key)
-                self.logger.info(f"Cache HIT: Using cached data for {canonical_key}")
+                self.logger.info(f"✓ Cache HIT: Using cached data for {canonical_key}")
+                sys.stdout.flush()
                 aliases = cached_data.get('aliases', [])
                 return {
                     "source": "redis",
@@ -107,10 +115,13 @@ class QueryController:
                     "aliases": aliases
                 }
             else:
-                self.logger.info(f"Cache MISS: Key {canonical_key} found but no data")
+                self.logger.info(f"✗ Cache MISS: Key {canonical_key} found but no data")
+                sys.stdout.flush()
         else:
+            log_embeddings_result(False)
             log_redis_check(False)
-            self.logger.info("No matching alias found - proceeding to live extraction")
+            self.logger.info("→ No matching alias found - proceeding to live extraction")
+            sys.stdout.flush()
         
         # ========================================
         # LIVE WEB EXTRACTION
@@ -125,12 +136,20 @@ class QueryController:
         import os
         import json
         
-        # Generate canonical key if needed
+        # ========================================
+        # STEP 2: GENERATE CANONICAL KEY
+        # ========================================
         if not canonical_key or canonical_key == 'general':
+            log_step(2, "GENERATE CANONICAL KEY", "Creating topic identifier")
+            sys.stdout.flush()
             canonical_key = self.openai_service.generate_canonical_key(query)
-            self.logger.info(f"Generated canonical key: {canonical_key}")
+            log_canonical_key_generation(query, canonical_key)
+            sys.stdout.flush()
         
-        log_resource_selection(query)
+        # ========================================
+        # STEP 3: RESOURCE SELECTION
+        # ========================================
+        log_step(3, "RESOURCE SELECTION", "Finding best resource URL")
 
         # Load resources
         resources_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources.json")
@@ -146,11 +165,16 @@ class QueryController:
         if resources:
             selected_key, selected_url = self.openai_service.select_best_resource(query, resources)
             if selected_key:
-                self.logger.info(f"Found helper resource: {selected_key} -> {selected_url}")
+                log_resource_selection(query, selected_url)
+            else:
+                log_resource_selection(query, None)
 
-        # Extract data
-        self.logger.info("Extracting data for streaming")
-        log_web_extraction_start(canonical_key)
+        # ========================================
+        # STEP 4: DATA EXTRACTION
+        # ========================================
+        log_step(4, "DATA EXTRACTION", f"Extracting from {'PDF' if selected_url and '.pdf' in selected_url.lower() else 'Web'}")
+        log_web_extraction_start(selected_url or "Web Search")
+        sys.stdout.flush()
 
         json_data = self.extractor_service.extract_data(
             canonical_key, 
@@ -159,9 +183,12 @@ class QueryController:
         )
 
         if json_data:
-            log_web_extraction_complete(canonical_key, True, len(str(json_data)))
+            log_web_extraction_complete(selected_url or canonical_key, True, len(str(json_data)))
+            log_json_building_complete(list(json_data.keys()))
+            sys.stdout.flush()
         else:
-            log_web_extraction_complete(canonical_key, False)
+            log_web_extraction_complete(selected_url or canonical_key, False)
+            sys.stdout.flush()
             json_data = {
                 "topic": canonical_key,
                 "query": query,
@@ -172,6 +199,7 @@ class QueryController:
         json_data['topic'] = canonical_key
 
         # Start background caching (non-blocking)
+        log_background_task_start("Caching & Alias Generation")
         background_thread = threading.Thread(
             target=self._background_cache_task,
             args=(canonical_key, json_data, query),
@@ -526,12 +554,11 @@ class QueryController:
         This runs in a separate thread and doesn't block the user response.
         """
         try:
-            self.logger.info(f"Background: Starting cache task for {canonical_key}")
+            self.logger.debug(f"🔄 Background: Starting cache task for {canonical_key}")
             
             # ========================================
             # Generate 10 Arabic + 10 English Aliases
             # ========================================
-            self.logger.info("Background: Generate 10 Arabic + 10 English Aliases")
             log_alias_generation_start()
 
             aliases = []
@@ -541,7 +568,7 @@ class QueryController:
                 ai_aliases = self.openai_service.generate_aliases_with_ai(canonical_key, query)
                 if ai_aliases:
                     aliases = ai_aliases
-                    self.logger.info(f"Background: Generated {len(aliases)} AI aliases")
+                    self.logger.debug(f"  → Generated {len(aliases)} AI aliases")
 
             # Add original query as alias
             if query.lower() not in [a.lower() for a in aliases]:
@@ -552,13 +579,11 @@ class QueryController:
             # ========================================
             # Store in Redis (with embeddings)
             # ========================================
-            self.logger.info("Background: Store in Redis")
-
             if self.redis_service.is_connected():
                 # Generate embeddings for aliases
                 alias_embeddings = {}
                 if self.embeddings_service.is_configured():
-                    self.logger.info(f"Background: Generating embeddings for {len(aliases)} aliases")
+                    self.logger.debug(f"  → Generating embeddings for {len(aliases)} aliases")
                     embeddings_batch = self.embeddings_service.generate_embeddings_batch(aliases)
                     for alias, embedding in embeddings_batch.items():
                         alias_embeddings[alias] = embedding
@@ -574,12 +599,14 @@ class QueryController:
                     alias_embeddings
                 )
                 log_redis_cache_store(canonical_key, success)
-                self.logger.info(f"Background: Cache task completed for {canonical_key} - Success: {success}")
+                log_background_task_complete("Caching & Alias Generation", success)
             else:
-                self.logger.warning("Background: Redis not connected, skipping cache")
+                self.logger.debug("  → Redis not connected, skipping cache")
+                log_background_task_complete("Caching & Alias Generation", False)
                 
         except Exception as e:
-            self.logger.error(f"Background cache task failed: {e}", exc_info=True)
+            self.logger.error(f"Background cache task failed: {e}")
+            log_background_task_complete("Caching & Alias Generation", False)
     
     # ========================================
     # API HELPER METHODS

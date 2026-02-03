@@ -18,10 +18,18 @@ from logger import (
 )
 from config import OPENAI_API_KEY, SIMILARITY_THRESHOLD
 import os
+import sys
 import json
+import logging
+
+# Configure Flask/Werkzeug logging to not interfere with our logs
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
 app = Flask(__name__)
 CORS(app)
+
+# Disable Flask's default logger to avoid duplicate logs
+app.logger.disabled = True
 
 # Initialize controller and services
 query_controller = QueryController()
@@ -293,11 +301,19 @@ def handle_query_stream():
         query = data['query']
         redis_json = data.get('redis_json', None)
         
+        # Log query received
+        from logger import log_query_received
+        log_query_received(query, redis_json is not None)
+        sys.stdout.flush()  # Force flush to terminal
+        
         def generate():
             try:
+                from logger import log_answer_generation, log_answer_streaming_start, log_answer_streaming_complete, log_response_ready
+                
                 # Process query to get JSON data (but don't generate answer yet)
                 # We'll extract the data first, then stream the answer
                 result_data = query_controller.process_query_for_streaming(query, redis_json)
+                sys.stdout.flush()  # Force flush to terminal
                 
                 # Send metadata first (source, json structure)
                 yield f"data: {json.dumps({'type': 'metadata', 'data': result_data})}\n\n"
@@ -307,12 +323,24 @@ def handle_query_stream():
                 source = result_data.get('source', 'live_web')
                 clean_json = {k: v for k, v in json_data.items() if k != 'aliases'}
                 
+                # Log answer generation
+                log_answer_generation(source)
+                log_answer_streaming_start()
+                sys.stdout.flush()  # Force flush to terminal
+                
                 # Stream answer chunks
                 openai_service = query_controller.openai_service
+                total_chars = 0
                 for chunk in openai_service.generate_answer_stream(clean_json, query, source):
                     if chunk:
+                        total_chars += len(chunk)
                         # JSON encoding will handle all escaping automatically
                         yield f"data: {json.dumps({'type': 'chunk', 'content': chunk}, ensure_ascii=False)}\n\n"
+                
+                # Log completion
+                log_answer_streaming_complete(total_chars)
+                log_response_ready(source, total_chars, len(result_data.get('aliases', [])))
+                sys.stdout.flush()  # Force flush to terminal
                 
                 # Send completion signal
                 yield f"data: {json.dumps({'type': 'done'})}\n\n"
@@ -438,27 +466,16 @@ def get_aliases(canonical_key):
 
 if __name__ == '__main__':
     from config import SERVER_HOST, SERVER_PORT
+    from logger import log_system_ready
     
     # Initialize logging
     log_system_start()
     log_system_config(redis_service.is_connected(), bool(OPENAI_API_KEY))
     
     logger = get_logger()
-    logger.info(f"Starting University Assistant server on {SERVER_HOST}:{SERVER_PORT}")
-    logger.info(f"Redis connected: {redis_service.is_connected()}")
-    logger.info(f"Similarity threshold: {SIMILARITY_THRESHOLD}")
-    logger.info("Using Embeddings + Cosine Similarity for alias matching")
-    logger.info("Using ChatGPT knowledge for information generation")
+    logger.info(f"📊 Similarity Threshold: {SIMILARITY_THRESHOLD}")
+    logger.info(f"🔄 WORKFLOW: Query → Embeddings → Redis Cache → PDF/Web Extract → Answer")
     
-    print(f"\n{'='*60}")
-    print("UNIVERSITY ASSISTANT SERVER")
-    print(f"{'='*60}")
-    print(f"Server: http://{SERVER_HOST}:{SERVER_PORT}")
-    print(f"Redis: {'Connected' if redis_service.is_connected() else 'Not Connected'}")
-    print(f"OpenAI: {'Configured' if OPENAI_API_KEY else 'Not Configured'}")
-    print(f"Similarity Threshold: {SIMILARITY_THRESHOLD}")
-    print(f"{'='*60}")
-    print("WORKFLOW: Embeddings → Cosine Similarity → Redis → ChatGPT Web Search")
-    print(f"{'='*60}\n")
+    log_system_ready(SERVER_HOST, SERVER_PORT)
     
     app.run(host=SERVER_HOST, port=SERVER_PORT, debug=True)
