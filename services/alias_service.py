@@ -1,7 +1,7 @@
 """
 Alias service for JUST University Assistant.
 خدمة الأسماء المستعارة لمساعد جامعة العلوم والتكنولوجيا
-
+image.png
 Handles normalization, multilingual support, alias generation and validation.
 NEVER uses 'general' - always generates specific keys.
 """
