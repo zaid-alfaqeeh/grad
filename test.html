@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>مساعد جامعة العلوم والتكنولوجيا - JUST Assistant</title>
+    <title>
+      Jordan University of Science and Technology Assistant - JUST Assistant
+    </title>
     <link
       href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap"
       rel="stylesheet"
@@ -345,10 +347,92 @@
         background: white;
         line-height: 1.8;
         font-size: 1rem;
-        white-space: pre-wrap;
         max-height: 600px;
         overflow-y: auto;
         word-wrap: break-word;
+      }
+
+      /* Markdown Rendered Styles */
+      .answer-box h1, .answer-box h2, .answer-box h3, .answer-box h4 {
+        color: var(--primary);
+        margin: 1rem 0 0.5rem 0;
+        font-weight: 700;
+      }
+      .answer-box h1 { font-size: 1.5rem; }
+      .answer-box h2 { font-size: 1.3rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; }
+      .answer-box h3 { font-size: 1.15rem; }
+      .answer-box h4 { font-size: 1.05rem; }
+      
+      .answer-box p {
+        margin: 0.75rem 0;
+      }
+      
+      .answer-box ul, .answer-box ol {
+        margin: 0.75rem 0;
+        padding-right: 1.5rem;
+      }
+      
+      .answer-box li {
+        margin: 0.4rem 0;
+        padding-right: 0.5rem;
+      }
+      
+      .answer-box strong, .answer-box b {
+        color: var(--primary-dark);
+        font-weight: 700;
+      }
+      
+      .answer-box em, .answer-box i {
+        color: var(--secondary);
+      }
+      
+      .answer-box code {
+        background: #f1f5f9;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.9em;
+      }
+      
+      .answer-box blockquote {
+        border-right: 4px solid var(--primary);
+        padding-right: 1rem;
+        margin: 1rem 0;
+        background: #f8fafc;
+        padding: 0.75rem 1rem;
+        border-radius: 0 8px 8px 0;
+      }
+      
+      .answer-box a {
+        color: var(--primary);
+        text-decoration: underline;
+      }
+      
+      .answer-box hr {
+        border: none;
+        border-top: 2px solid var(--border);
+        margin: 1.5rem 0;
+      }
+      
+      .answer-box table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+      }
+      
+      .answer-box th, .answer-box td {
+        border: 1px solid var(--border);
+        padding: 0.5rem;
+        text-align: right;
+      }
+      
+      .answer-box th {
+        background: var(--primary);
+        color: white;
+      }
+      
+      .answer-box tr:nth-child(even) {
+        background: #f8fafc;
       }
 
       .toggle-json-btn {
@@ -429,8 +513,9 @@
     <div class="container">
       <header class="header">
         <div class="header-content">
-          <h1>🎓 مساعد جامعة العلوم والتكنولوجيا</h1>
-          <p>اسأل أي سؤال عن الجامعة وسأبحث وأجيبك فوراً</p>
+          <h1>
+            Jordan University of Science and Technology Assistant 
+          </h1>
           <div class="header-badge">
             <span>🇯🇴</span>
             <span>Jordan University of Science and Technology - JUST</span>
@@ -517,8 +602,22 @@
       </div>
     </div>
 
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
       const API_BASE = window.location.origin;
+      
+      // Configure marked for safe rendering
+      marked.setOptions({
+        breaks: true,  // Convert \n to <br>
+        gfm: true,     // GitHub Flavored Markdown
+      });
+      
+      // Function to render markdown safely
+      function renderMarkdown(text) {
+        if (!text) return '';
+        return marked.parse(text);
+      }
 
       window.onload = function () {
         checkHealth();
@@ -628,7 +727,7 @@
         const jsonBox = document.getElementById("jsonBox");
 
         // Clear previous content
-        answerBox.textContent = "";
+        answerBox.innerHTML = "";
         let metadata = null;
         let fullAnswer = "";
 
@@ -679,9 +778,9 @@
                   // Hide loading
                   document.getElementById("loading").classList.remove("active");
                 } else if (data.type === "chunk") {
-                  // Append chunk to answer (content is already properly formatted)
+                  // Append chunk to answer and render as markdown
                   fullAnswer += data.content;
-                  answerBox.textContent = fullAnswer;
+                  answerBox.innerHTML = renderMarkdown(fullAnswer);
 
                   // Auto-scroll to bottom
                   answerBox.scrollTop = answerBox.scrollHeight;
@@ -698,9 +797,9 @@
           }
         }
 
-        // Ensure we have the full answer displayed
+        // Ensure we have the full answer displayed with markdown rendered
         if (fullAnswer) {
-          answerBox.textContent = fullAnswer;
+          answerBox.innerHTML = renderMarkdown(fullAnswer);
         }
       }
 
@@ -719,8 +818,8 @@
           sourceBadge.className = "source-badge live";
         }
 
-        // Display answer
-        answerBox.textContent = data.answer || "لم يتم العثور على إجابة";
+        // Display answer with markdown rendering
+        answerBox.innerHTML = renderMarkdown(data.answer || "لم يتم العثور على إجابة");
 
         // Display JSON
         jsonBox.textContent = JSON.stringify(data.json, null, 2);
