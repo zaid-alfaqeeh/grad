@@ -20,3 +20,7 @@ python-dotenv>=1.0.0
 
 # NumPy - for cosine similarity calculations
 numpy>=1.24.0
+
+# PDF Processing - for extracting text from PDF documents
+PyPDF2>=3.0.0
+requests>=2.31.0
